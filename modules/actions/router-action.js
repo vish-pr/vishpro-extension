@@ -4,8 +4,7 @@
  * Keeps prompt minimal - detailed browser info only shown if needed
  */
 
-import { getBrowserState } from '../browser-state.js';
-import { BROWSER_ACTION_ROUTER } from './browser-action-router.js';
+import { BROWSER_ACTION } from './browser-action-router.js';
 import { CHAT_RESPONSE } from './chat-action.js';
 
 /**
@@ -53,17 +52,9 @@ export const routerAction = {
       user_message: {
         type: 'string',
         description: 'The user\'s natural language request'
-      },
-      page_url: {
-        type: 'string',
-        description: 'Current page URL'
-      },
-      tabId: {
-        type: 'number',
-        description: 'Browser tab ID'
       }
     },
-    required: ['user_message', 'tabId'],
+    required: ['user_message'],
     additionalProperties: false
   },
   output_schema: {
@@ -75,14 +66,6 @@ export const routerAction = {
     additionalProperties: false
   },
   steps: [
-    // Pre-step: Register tab in browser state
-    async (params) => {
-      const browserState = getBrowserState();
-      if (params.tabId) {
-        await browserState.ensureTabRegistered(params.tabId, params.page_url);
-      }
-      return params;
-    },
     {
       // Tier-1 LLM choice: BROWSER_ACTION or CHAT_RESPONSE
       llm: {
@@ -94,11 +77,10 @@ What tool should you use to handle this request?`,
       },
       choice: {
         available_actions: [
-          BROWSER_ACTION_ROUTER,
+          BROWSER_ACTION,
           CHAT_RESPONSE
         ],
-        stop_action: CHAT_RESPONSE,
-        max_iterations: 1  // Single decision - no loop at tier-1
+        stop_action: CHAT_RESPONSE
       },
       // Flag to use summary browser state (not full details)
       use_browser_summary: true

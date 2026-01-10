@@ -5,6 +5,10 @@
 
 /**
  * Simple template renderer that replaces {{variable}} patterns with context values
+ * Supports:
+ * - {{variable}} - simple variable substitution
+ * - {{#variable}}content{{/variable}} - conditional block (renders if variable is truthy)
+ *
  * @param {string} template - Template string with {{variable}} placeholders
  * @param {Object} context - Context object with variable values
  * @returns {string} Rendered template
@@ -14,8 +18,20 @@ export function renderTemplate(template, context) {
     return template;
   }
 
-  // Replace {{variable}} with context values
-  return template.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+  // First, handle conditional blocks {{#var}}...{{/var}}
+  let result = template.replace(/\{\{#([^}]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (match, key, content) => {
+    const trimmedKey = key.trim();
+    const value = getNestedProperty(context, trimmedKey);
+
+    // Only render content if value exists and is truthy
+    if (value) {
+      return renderTemplate(content, context);
+    }
+    return '';
+  });
+
+  // Then replace {{variable}} with context values
+  result = result.replace(/\{\{([^#/}][^}]*)\}\}/g, (match, key) => {
     const trimmedKey = key.trim();
 
     // Support nested properties like {{user.name}}
@@ -23,6 +39,8 @@ export function renderTemplate(template, context) {
 
     return value !== undefined ? String(value) : match;
   });
+
+  return result;
 }
 
 /**

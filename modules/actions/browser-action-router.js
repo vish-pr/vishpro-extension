@@ -4,7 +4,6 @@
  * Called when BROWSER_ACTION is chosen from tier-1 router
  */
 
-import { getBrowserState } from '../browser-state.js';
 import {
   ACTION_READ_PAGE,
   ACTION_CLICK_ELEMENT,
@@ -24,7 +23,7 @@ import { CHAT_RESPONSE } from './chat-action.js';
 /**
  * Action name constant
  */
-export const BROWSER_ACTION_ROUTER = 'BROWSER_ACTION_ROUTER';
+export const BROWSER_ACTION = 'BROWSER_ACTION';
 
 /**
  * Detailed system prompt for browser actions (tier-2)
@@ -87,11 +86,11 @@ const BROWSER_ACTION_SYSTEM_PROMPT = `You are a browser automation assistant exe
 - IDs appear in browser state as [id] next to each element`;
 
 /**
- * BROWSER_ACTION_ROUTER action (Tier-2)
+ * BROWSER_ACTION action (Tier-2)
  * Handles detailed browser automation with full action choices
  */
 export const browserActionRouter = {
-  name: BROWSER_ACTION_ROUTER,
+  name: BROWSER_ACTION,
   description: 'Execute browser actions (read, click, fill, navigate, scroll). Use this when you need to interact with web pages.',
   input_schema: {
     type: 'object',
@@ -100,20 +99,12 @@ export const browserActionRouter = {
         type: 'string',
         description: 'The user\'s natural language request'
       },
-      page_url: {
+      instructions: {
         type: 'string',
-        description: 'Current page URL'
-      },
-      tabId: {
-        type: 'number',
-        description: 'Browser tab ID'
-      },
-      justification: {
-        type: 'string',
-        description: 'Why browser action is needed'
+        description: 'Detailed instructions from router about what to accomplish'
       }
     },
-    required: ['user_message', 'tabId'],
+    required: ['user_message'],
     additionalProperties: false
   },
   output_schema: {
@@ -125,20 +116,14 @@ export const browserActionRouter = {
     additionalProperties: false
   },
   steps: [
-    // Pre-step: Ensure tab is registered
-    async (params) => {
-      const browserState = getBrowserState();
-      if (params.tabId) {
-        await browserState.ensureTabRegistered(params.tabId, params.page_url);
-      }
-      return params;
-    },
     {
       // LLM step with multi-turn browser action loop
       llm: {
         system_prompt: BROWSER_ACTION_SYSTEM_PROMPT,
-        message: `{{user_message}}
-
+        message: `User request: {{user_message}}
+{{#instructions}}
+Instructions: {{instructions}}
+{{/instructions}}
 Execute the appropriate browser actions. The browser state shows current page content if available.`,
         intelligence: 'MEDIUM'
       },

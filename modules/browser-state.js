@@ -31,6 +31,112 @@ export class BrowserState {
     this.tabs = new Map();
     // Track which tab should show expanded content in formatForChat()
     this.expandedTabId = null;
+    // Current active tab - tracked via Chrome events
+    this.currentTabId = null;
+    this.currentTabUrl = null;
+
+    // Initialization promise - resolves when current tab is known
+    this._readyPromise = null;
+    this._isReady = false;
+
+    // Initialize Chrome event listeners
+    this._initTabListeners();
+  }
+
+  /**
+   * Returns a promise that resolves when browser state is initialized
+   * @returns {Promise<void>}
+   */
+  ready() {
+    return this._readyPromise || Promise.resolve();
+  }
+
+  /**
+   * Check if browser state is initialized
+   * @returns {boolean}
+   */
+  isReady() {
+    return this._isReady;
+  }
+
+  /**
+   * Initialize Chrome tab event listeners to track current tab
+   */
+  _initTabListeners() {
+    // Track when user switches tabs
+    chrome.tabs.onActivated.addListener(async (activeInfo) => {
+      this.currentTabId = activeInfo.tabId;
+      try {
+        const tab = await chrome.tabs.get(activeInfo.tabId);
+        this.currentTabUrl = tab.url;
+        this.registerTab(activeInfo.tabId, tab.url);
+        logger.info('Tab activated', { tabId: activeInfo.tabId, url: tab.url });
+      } catch (e) {
+        logger.warn('Could not get tab info on activation', { tabId: activeInfo.tabId });
+      }
+    });
+
+    // Track URL changes in current tab
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (tabId === this.currentTabId && changeInfo.url) {
+        this.currentTabUrl = changeInfo.url;
+        this.registerTab(tabId, changeInfo.url);
+        logger.info('Current tab URL updated', { tabId, url: changeInfo.url });
+      }
+    });
+
+    // Initialize with current active tab
+    this._initCurrentTab();
+  }
+
+  /**
+   * Initialize current tab on startup
+   * Sets _readyPromise and _isReady when complete
+   */
+  _initCurrentTab() {
+    this._readyPromise = (async () => {
+      try {
+        // Try current window first
+        let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+        // Fallback: any active tab if current window has none
+        if (!tab) {
+          [tab] = await chrome.tabs.query({ active: true });
+          if (tab) {
+            logger.info('Using fallback: active tab from any window');
+          }
+        }
+
+        if (tab) {
+          this.currentTabId = tab.id;
+          this.currentTabUrl = tab.url;
+          this.registerTab(tab.id, tab.url);
+          logger.info('Initialized current tab', { tabId: tab.id, url: tab.url });
+        } else {
+          logger.warn('No active tab found during initialization');
+        }
+      } catch (e) {
+        logger.warn('Could not initialize current tab', { error: e.message });
+      } finally {
+        this._isReady = true;
+      }
+    })();
+  }
+
+  /**
+   * Get the current active tab ID
+   * @returns {number|null}
+   */
+  getCurrentTabId() {
+    return this.currentTabId;
+  }
+
+  /**
+   * Get the current active tab URL
+   * @returns {string|null}
+   */
+  getCurrentTabUrl() {
+    return this.currentTabUrl;
   }
 
   /**
@@ -205,21 +311,23 @@ export class BrowserState {
    * @returns {string} Brief summary of browser state
    */
   formatSummary() {
-    if (this.tabs.size === 0) {
-      return 'Browser: No tabs being tracked. Use BROWSER_ACTION to interact with web pages.';
-    }
-
     const lines = ['Browser State (summary):'];
-    for (const [tabId, tab] of this.tabs) {
-      lines.push(`  Tab ${tabId}: ${tab.currentUrl}`);
-      if (tab.pageContents.length > 0) {
-        const current = tab.pageContents.filter(pc => pc.status === 'current');
-        if (current.length > 0) {
-          lines.push(`    - Has extracted content (${current[0].content.links?.length || 0} links, ${current[0].content.buttons?.length || 0} buttons)`);
+    lines.push(`Current Tab: ${this.currentTabId} (${this.currentTabUrl || 'unknown'})`);
+
+    if (this.tabs.size > 0) {
+      lines.push('Tracked Tabs:');
+      for (const [tabId, tab] of this.tabs) {
+        const isCurrent = tabId === this.currentTabId ? ' [CURRENT]' : '';
+        lines.push(`  Tab ${tabId}${isCurrent}: ${tab.currentUrl}`);
+        if (tab.pageContents.length > 0) {
+          const current = tab.pageContents.filter(pc => pc.status === 'current');
+          if (current.length > 0) {
+            lines.push(`    - Has extracted content (${current[0].content.links?.length || 0} links, ${current[0].content.buttons?.length || 0} buttons)`);
+          }
         }
       }
     }
-    lines.push('\nUse BROWSER_ACTION to read page content, click elements, fill forms, or navigate.');
+    lines.push('\nUse BROWSER_ACTION to interact with web pages.');
     return lines.join('\n');
   }
 
@@ -231,11 +339,13 @@ export class BrowserState {
    */
   formatForChat() {
     const lines = [];
-    lines.push('=== BROWSER STATE ===\n');
+    lines.push('=== BROWSER STATE ===');
+    lines.push(`Current Tab: ${this.currentTabId} (${this.currentTabUrl || 'unknown'})\n`);
 
     for (const [tabId, tab] of this.tabs) {
       const isExpanded = tabId === this.expandedTabId;
-      lines.push(`Tab ${tabId}${isExpanded ? ' [EXPANDED]' : ''}:`);
+      const isCurrent = tabId === this.currentTabId ? ' [CURRENT]' : '';
+      lines.push(`Tab ${tabId}${isCurrent}${isExpanded ? ' [EXPANDED]' : ''}:`);
       lines.push(`  Current URL: ${tab.currentUrl}`);
 
       if (tab.urlHistory.length > 1) {
@@ -646,10 +756,12 @@ export function getBrowserState() {
 
 /**
  * Get browser state in all formats (formatted, JSON, instance)
- * @returns {Object} Object containing formatted, summary, json, and instance
+ * Waits for initialization to complete before returning
+ * @returns {Promise<Object>} Object containing formatted, summary, json, and instance
  */
-export function getBrowserStateBundle() {
+export async function getBrowserStateBundle() {
   const state = getBrowserState();
+  await state.ready();
   return {
     formatted: state.formatForChat(),
     summary: state.formatSummary(),

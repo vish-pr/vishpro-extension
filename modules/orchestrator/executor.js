@@ -61,7 +61,12 @@ export async function executeAction(action, params = {}) {
   if (action.input_schema) {
     const validation = validateParams(params, action.input_schema);
     if (!validation.valid) {
-      logger.warn(`Validation warnings: ${action.name}`, { errors: validation.errors });
+      const errorMsg = `Validation failed for ${action.name}: ${validation.errors.join(', ')}`;
+      logger.error(errorMsg, { errors: validation.errors });
+      const error = new Error(errorMsg);
+      error.isValidationError = true;
+      error.validationErrors = validation.errors;
+      throw error;
     }
   }
 
@@ -98,7 +103,7 @@ export async function executeAction(action, params = {}) {
 async function executeStep(step, params, prevResult) {
   // Function step: (params, prevResult, browser) => result
   if (typeof step === 'function') {
-    const browser = getBrowserStateBundle();
+    const browser = await getBrowserStateBundle();
     return await withTimeout(step(params, prevResult, browser), STEP_TIMEOUT_MS);
   }
 
@@ -129,7 +134,7 @@ async function executeStep(step, params, prevResult) {
 
 async function executeLLMStep(step, params) {
   const { llm, choice } = step;
-  const browser = getBrowserStateBundle();
+  const browser = await getBrowserStateBundle();
 
   // Determine which browser state format to use
   const useSummary = step.use_browser_summary === true;
@@ -176,12 +181,15 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
     { role: 'user', content: initialMessage }
   ];
 
+  // Keep complete history for summary (not pruned)
+  const fullHistory = [];
+
   for (let i = 0; i < max_iterations; i++) {
     logger.info(`Turn ${i + 1}/${max_iterations}`);
 
     // Fresh browser state each turn - insert as second-to-last message
     // Use summary for tier-1, full for tier-2
-    const browser = getBrowserStateBundle();
+    const browser = await getBrowserStateBundle();
     const browserStateText = useSummary ? browser.summary : browser.formatted;
     const messagesWithBrowser = insertBrowserStateMessage(conversation, browserStateText);
 
@@ -195,22 +203,74 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
     logger.info(`Chose: ${llmChoice.tool}`);
     conversation.push({ role: 'assistant', content: JSON.stringify(llmChoice, null, 2) });
 
+    // Record in full history
+    fullHistory.push({
+      turn: i + 1,
+      action: llmChoice.tool,
+      params: llmChoice,
+      timestamp: new Date().toISOString()
+    });
+
     // Stop action -> execute and return final result
     if (llmChoice.tool === stop_action) {
       const stopAction = actionsRegistry[stop_action];
       if (!stopAction) throw new Error(`Stop action not found: ${stop_action}`);
 
-      // Include original params + LLM choice params
-      const stopParams = { ...params, ...pickParams(llmChoice, stopAction) };
-      return await executeAction(stopAction, stopParams);
+      // Only use params from LLM choice - don't merge original params
+      const stopParams = pickParams(llmChoice, stopAction);
+      // Include complete conversation history for summary
+      stopParams.conversation_history = formatConversationHistory(fullHistory);
+      try {
+        return await executeAction(stopAction, stopParams);
+      } catch (error) {
+        // If validation error, feed back to LLM to fix
+        if (error.isValidationError) {
+          logger.warn(`Stop action ${stop_action} validation failed, asking LLM to fix`, {
+            errors: error.validationErrors
+          });
+          conversation.push({
+            role: 'user',
+            content: `Error: Your ${stop_action} call failed validation.\n` +
+              `Errors: ${error.validationErrors.join(', ')}\n` +
+              `Please fix the parameters and try again.`
+          });
+          continue; // Let LLM try again
+        }
+        throw error;
+      }
     }
 
     // Execute chosen action
     const actionDef = actionsRegistry[llmChoice.tool];
     if (!actionDef) throw new Error(`Action not found: ${llmChoice.tool}`);
 
-    const actionParams = { ...params, ...pickParams(llmChoice, actionDef) };
-    const actionResult = await executeAction(actionDef, actionParams);
+    const actionParams = pickParams(llmChoice, actionDef);
+
+    let actionResult;
+    try {
+      actionResult = await executeAction(actionDef, actionParams);
+    } catch (error) {
+      // If validation error from LLM's choice, feed back to LLM to fix
+      if (error.isValidationError) {
+        logger.warn(`LLM chose ${llmChoice.tool} with invalid params, asking to fix`, {
+          errors: error.validationErrors
+        });
+        // Record error in full history
+        fullHistory[fullHistory.length - 1].error = error.validationErrors.join(', ');
+        conversation.push({
+          role: 'user',
+          content: `Error: Your ${llmChoice.tool} call failed validation.\n` +
+            `Errors: ${error.validationErrors.join(', ')}\n` +
+            `Please fix the parameters and try again.`
+        });
+        continue; // Let LLM try again
+      }
+      // Other errors should propagate
+      throw error;
+    }
+
+    // Record result in full history
+    fullHistory[fullHistory.length - 1].result = actionResult;
 
     // Add result to internal conversation
     conversation.push({
@@ -247,6 +307,36 @@ function pickParams(source, actionDef) {
 }
 
 /**
+ * Format complete conversation history for summary
+ */
+function formatConversationHistory(fullHistory) {
+  if (!fullHistory || fullHistory.length === 0) {
+    return 'No previous actions in this conversation.';
+  }
+
+  return fullHistory.map(entry => {
+    let line = `Turn ${entry.turn}: ${entry.action}`;
+    if (entry.params?.instructions) {
+      line += `\n  Instructions: ${entry.params.instructions}`;
+    }
+    if (entry.result) {
+      const resultStr = typeof entry.result === 'string'
+        ? entry.result
+        : JSON.stringify(entry.result, null, 2);
+      // Truncate very long results
+      const truncated = resultStr.length > 500
+        ? resultStr.substring(0, 500) + '...'
+        : resultStr;
+      line += `\n  Result: ${truncated}`;
+    }
+    if (entry.error) {
+      line += `\n  Error: ${entry.error}`;
+    }
+    return line;
+  }).join('\n\n');
+}
+
+/**
  * Insert browser state as a separate message before the last user message
  * Pattern: [system, ...messages, BROWSER_STATE, last_user_message]
  */
@@ -276,33 +366,44 @@ function insertBrowserStateMessage(conversation, browserFormatted) {
 }
 
 function buildChoiceSchema(availableActions, stopAction) {
-  const descriptions = [];
-  const allParams = {};
+  // Start with base properties
+  const properties = {
+    tool: {
+      type: 'string',
+      enum: availableActions,
+      description: 'The tool to use for this request'
+    },
+    justification: {
+      type: 'string',
+      description: 'Brief explanation of why this tool is appropriate'
+    },
+    instructions: {
+      type: 'string',
+      description: 'Detailed instructions and input for the tool to execute'
+    },
+    notes: {
+      type: 'string',
+      description: 'Additional context or observations relevant to the task'
+    }
+  };
 
-  for (const name of availableActions) {
-    const action = actionsRegistry[name];
-    const desc = action?.description || name;
-    descriptions.push(`${name}: ${desc}${name === stopAction ? ' [STOP]' : ''}`);
-
+  // Collect properties from all available action input schemas
+  for (const actionName of availableActions) {
+    const action = actionsRegistry[actionName];
     if (action?.input_schema?.properties) {
-      for (const [k, v] of Object.entries(action.input_schema.properties)) {
-        if (!(k in allParams)) allParams[k] = { ...v };
+      for (const [key, prop] of Object.entries(action.input_schema.properties)) {
+        // Don't override base properties
+        if (!properties[key]) {
+          properties[key] = prop;
+        }
       }
     }
   }
 
   return {
     type: 'object',
-    properties: {
-      tool: {
-        type: 'string',
-        enum: availableActions,
-        description: `Choose action:\n${descriptions.join('\n')}`
-      },
-      justification: { type: 'string', description: 'Why?' },
-      ...allParams
-    },
-    required: ['tool', 'justification'],
+    properties,
+    required: ['tool', 'justification', 'instructions', 'user_message'],
     additionalProperties: false
   };
 }

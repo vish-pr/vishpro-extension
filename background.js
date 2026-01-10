@@ -38,8 +38,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function handleUserMessage({ message, apiKey, tabId, tabUrl }) {
-  logger.info('Handling User Message', { userMessage: message, tabId, tabUrl });
+async function handleUserMessage({ message }) {
+  logger.info('Handling User Message', { userMessage: message });
 
   try {
     // Check if any provider is initialized
@@ -54,7 +54,7 @@ async function handleUserMessage({ message, apiKey, tabId, tabUrl }) {
     }
 
     logger.info('Executing action', { action: BROWSER_ROUTER });
-    const result = await executeAction(action, { user_message: message, page_url: tabUrl, tabId });
+    const result = await executeAction(action, { user_message: message });
     logger.info('Action completed', { hasResponse: !!result.response });
 
     // Return the response from the action

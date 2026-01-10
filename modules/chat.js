@@ -11,13 +11,9 @@ export function addMessage(role, content) {
 }
 
 async function sendMessageToBackground(message) {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
   return chrome.runtime.sendMessage({
     action: 'processMessage',
-    message,
-    tabId: tab.id,
-    tabUrl: tab.url
+    message
   });
 }
 
