@@ -20,28 +20,11 @@ async function executeScript(tabId, func, args = []) {
 }
 
 /**
- * Action name constants
- */
-export const ACTION_READ_PAGE = 'READ_PAGE';
-export const ACTION_CLICK_ELEMENT = 'CLICK_ELEMENT';
-export const ACTION_NAVIGATE_TO = 'NAVIGATE_TO';
-export const ACTION_GET_PAGE_STATE = 'GET_PAGE_STATE';
-export const ACTION_FILL_FORM = 'FILL_FORM';
-export const ACTION_SELECT_OPTION = 'SELECT_OPTION';
-export const ACTION_CHECK_CHECKBOX = 'CHECK_CHECKBOX';
-export const ACTION_SUBMIT_FORM = 'SUBMIT_FORM';
-export const ACTION_SCROLL_TO = 'SCROLL_TO';
-export const ACTION_WAIT_FOR_LOAD = 'WAIT_FOR_LOAD';
-export const ACTION_WAIT_FOR_ELEMENT = 'WAIT_FOR_ELEMENT';
-export const ACTION_GO_BACK = 'GO_BACK';
-export const ACTION_GO_FORWARD = 'GO_FORWARD';
-
-/**
  * READ_PAGE action
  * Extracts page content including text, links, buttons, and form inputs
  */
 export const READ_PAGE = {
-  name: ACTION_READ_PAGE,
+  name: 'READ_PAGE',
   description: 'Extract page content including title, text, links, buttons, and form inputs',
   input_schema: {
     type: 'object',
@@ -71,7 +54,7 @@ export const READ_PAGE = {
  * Clicks an element on the page by element ID from READ_PAGE with optional modifiers
  */
 export const CLICK_ELEMENT = {
-  name: ACTION_CLICK_ELEMENT,
+  name: 'CLICK_ELEMENT',
   description: 'Click an element on the page using an element ID from READ_PAGE, with optional modifiers for opening in new tabs or downloading',
   input_schema: {
     type: 'object',
@@ -122,7 +105,7 @@ export const CLICK_ELEMENT = {
  * Navigates the current tab to a new URL
  */
 export const NAVIGATE_TO = {
-  name: ACTION_NAVIGATE_TO,
+  name: 'NAVIGATE_TO',
   description: 'Navigate to a different URL',
   input_schema: {
     type: 'object',
@@ -156,7 +139,7 @@ export const NAVIGATE_TO = {
  * Gets current page state including scroll position and viewport info
  */
 export const GET_PAGE_STATE = {
-  name: ACTION_GET_PAGE_STATE,
+  name: 'GET_PAGE_STATE',
   description: 'Get current page state including scroll position, viewport size, and load status',
   input_schema: {
     type: 'object',
@@ -198,7 +181,7 @@ export const GET_PAGE_STATE = {
  * Fills multiple form fields and optionally submits the form
  */
 export const FILL_FORM = {
-  name: ACTION_FILL_FORM,
+  name: 'FILL_FORM',
   description: 'Fill multiple form fields with values and optionally submit',
   input_schema: {
     type: 'object',
@@ -253,7 +236,7 @@ export const FILL_FORM = {
  * Selects an option in a dropdown/select element
  */
 export const SELECT_OPTION = {
-  name: ACTION_SELECT_OPTION,
+  name: 'SELECT_OPTION',
   description: 'Select an option from a dropdown menu',
   input_schema: {
     type: 'object',
@@ -317,7 +300,7 @@ export const SELECT_OPTION = {
  * Checks or unchecks a checkbox
  */
 export const CHECK_CHECKBOX = {
-  name: ACTION_CHECK_CHECKBOX,
+  name: 'CHECK_CHECKBOX',
   description: 'Check or uncheck a checkbox',
   input_schema: {
     type: 'object',
@@ -371,7 +354,7 @@ export const CHECK_CHECKBOX = {
  * Submits a form by clicking a submit button or calling form.submit()
  */
 export const SUBMIT_FORM = {
-  name: ACTION_SUBMIT_FORM,
+  name: 'SUBMIT_FORM',
   description: 'Submit a form',
   input_schema: {
     type: 'object',
@@ -427,7 +410,7 @@ export const SUBMIT_FORM = {
  * Scrolls the page in a specified direction or to a specific position
  */
 export const SCROLL_TO = {
-  name: ACTION_SCROLL_TO,
+  name: 'SCROLL_TO',
   description: 'Scroll the page up, down, to top, to bottom, or by specific pixels',
   input_schema: {
     type: 'object',
@@ -475,7 +458,7 @@ export const SCROLL_TO = {
  * Waits for page to fully load
  */
 export const WAIT_FOR_LOAD = {
-  name: ACTION_WAIT_FOR_LOAD,
+  name: 'WAIT_FOR_LOAD',
   description: 'Wait for the page to finish loading',
   input_schema: {
     type: 'object',
@@ -535,7 +518,7 @@ export const WAIT_FOR_LOAD = {
  * Waits for a specific element to appear on the page
  */
 export const WAIT_FOR_ELEMENT = {
-  name: ACTION_WAIT_FOR_ELEMENT,
+  name: 'WAIT_FOR_ELEMENT',
   description: 'Wait for a specific element to appear on the page',
   input_schema: {
     type: 'object',
@@ -600,7 +583,7 @@ export const WAIT_FOR_ELEMENT = {
  * Go back one page in browser history
  */
 export const GO_BACK = {
-  name: ACTION_GO_BACK,
+  name: 'GO_BACK',
   description: 'Navigate back one page in browser history',
   input_schema: {
     type: 'object',
@@ -630,7 +613,7 @@ export const GO_BACK = {
  * Go forward one page in browser history
  */
 export const GO_FORWARD = {
-  name: ACTION_GO_FORWARD,
+  name: 'GO_FORWARD',
   description: 'Navigate forward one page in browser history',
   input_schema: {
     type: 'object',
@@ -780,18 +763,18 @@ Execute the appropriate browser actions. The browser state shows current page co
       },
       choice: {
         available_actions: [
-          READ_PAGE,
-          CLICK_ELEMENT,
-          FILL_FORM,
-          SELECT_OPTION,
-          CHECK_CHECKBOX,
-          SUBMIT_FORM,
-          NAVIGATE_TO,
-          SCROLL_TO,
-          WAIT_FOR_LOAD,
-          WAIT_FOR_ELEMENT,
-          GO_BACK,
-          GO_FORWARD,
+          READ_PAGE.name,
+          CLICK_ELEMENT.name,
+          FILL_FORM.name,
+          SELECT_OPTION.name,
+          CHECK_CHECKBOX.name,
+          SUBMIT_FORM.name,
+          NAVIGATE_TO.name,
+          SCROLL_TO.name,
+          WAIT_FOR_LOAD.name,
+          WAIT_FOR_ELEMENT.name,
+          GO_BACK.name,
+          GO_FORWARD.name,
           CHAT_RESPONSE
         ],
         stop_action: CHAT_RESPONSE,

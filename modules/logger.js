@@ -82,7 +82,7 @@ class Logger {
     // Store to chrome.storage.local (async, non-blocking)
     try {
       const storageData = await this.getStorageData();
-      storageData.push(fileLogLine);
+      storageData.push(compactLogLine);
 
       // Keep only recent logs in storage (last 500 entries)
       if (storageData.length > 500) {
