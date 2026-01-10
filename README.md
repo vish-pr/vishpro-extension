@@ -17,7 +17,7 @@ User Request
     ▼                                    ▼
 ┌─────────────────────────┐    ┌─────────────────────────┐
 │  Tier-2: Browser Router │    │  CHAT_RESPONSE          │
-│  (browser-action-router)│    │  Direct reply to user   │
+│  (browser-actions.js)   │    │  Direct reply to user   │
 │  ├─ Full action details │    └─────────────────────────┘
 │  ├─ Full browser state  │
 │  └─ Multi-turn loop     │
@@ -39,8 +39,7 @@ User Request
 
 ### Actions (`modules/actions/`)
 - **router-action.js** - Tier-1: High-level routing (BROWSER_ACTION vs CHAT_RESPONSE)
-- **browser-action-router.js** - Tier-2: Detailed browser actions (READ_PAGE, CLICK, etc.)
-- **browser-actions.js** - Individual action definitions (13 actions)
+- **browser-actions.js** - Tier-2 router + 13 browser action definitions (READ_PAGE, CLICK, etc.)
 - **chat-action.js** - Final response generation
 
 ### State Management
@@ -89,8 +88,7 @@ extension/
 │   │   └── executor.js       # Action execution engine
 │   ├── actions/
 │   │   ├── router-action.js  # Tier-1 routing
-│   │   ├── browser-action-router.js  # Tier-2 browser actions
-│   │   ├── browser-actions.js # 13 browser action definitions
+│   │   ├── browser-actions.js # Tier-2 router + 13 action definitions
 │   │   └── chat-action.js    # Response generation
 │   ├── browser-state.js      # Tab/page state management
 │   ├── llm.js               # LLM interface

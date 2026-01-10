@@ -13,7 +13,7 @@ export const elements = {
   currentTabExtractionContent: document.getElementById('currentTabExtractionContent'),
   historyTabContent: document.getElementById('historyTabContent'),
   actionsTabContent: document.getElementById('actionsTabContent'),
-  extractionTabs: document.querySelectorAll('.extraction-tab'),
+  extractionTabs: document.querySelectorAll('.tab-btn'),
 
   // Provider settings
   providerSelect: document.getElementById('providerSelect'),

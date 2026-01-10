@@ -4,7 +4,7 @@
  * Keeps prompt minimal - detailed browser info only shown if needed
  */
 
-import { BROWSER_ACTION } from './browser-action-router.js';
+import { BROWSER_ACTION } from './browser-actions.js';
 import { CHAT_RESPONSE } from './chat-action.js';
 
 /**

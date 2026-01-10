@@ -2,12 +2,66 @@
 import { elements } from './dom.js';
 import { logAction } from './storage.js';
 
+function clearEmptyState() {
+  const emptyState = elements.chatContainer.querySelector('.empty-state');
+  if (emptyState) {
+    emptyState.remove();
+  }
+}
+
+function setStatus(text, active = false) {
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  if (statusDot) {
+    statusDot.classList.toggle('active', active);
+  }
+  if (statusText) {
+    statusText.textContent = text;
+  }
+}
+
 export function addMessage(role, content) {
+  clearEmptyState();
+
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${role}`;
-  messageDiv.textContent = content;
+
+  const bubbleDiv = document.createElement('div');
+  bubbleDiv.className = 'message-bubble';
+  bubbleDiv.textContent = content;
+
+  messageDiv.appendChild(bubbleDiv);
   elements.chatContainer.appendChild(messageDiv);
   elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+}
+
+function addTypingIndicator() {
+  clearEmptyState();
+
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'message assistant';
+  messageDiv.id = 'typing-indicator';
+
+  const bubbleDiv = document.createElement('div');
+  bubbleDiv.className = 'message-bubble';
+  bubbleDiv.innerHTML = `
+    <div class="typing-indicator">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  `;
+
+  messageDiv.appendChild(bubbleDiv);
+  elements.chatContainer.appendChild(messageDiv);
+  elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+}
+
+function removeTypingIndicator() {
+  const indicator = document.getElementById('typing-indicator');
+  if (indicator) {
+    indicator.remove();
+  }
 }
 
 async function sendMessageToBackground(message) {
@@ -26,10 +80,14 @@ async function sendMessage() {
   elements.messageInput.style.height = 'auto';
   elements.sendButton.disabled = true;
 
+  setStatus('Processing', true);
+  addTypingIndicator();
+
   await logAction('message', `Sent: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`);
 
   try {
     const response = await sendMessageToBackground(message);
+    removeTypingIndicator();
 
     if (response.error) {
       addMessage('system', `Error: ${response.error}`);
@@ -37,9 +95,11 @@ async function sendMessage() {
       addMessage('assistant', response.result);
     }
   } catch (error) {
+    removeTypingIndicator();
     addMessage('system', `Error: ${error.message}`);
   } finally {
     elements.sendButton.disabled = false;
+    setStatus('Ready', false);
   }
 }
 
@@ -73,9 +133,10 @@ export function initChat(hasValidKey) {
   setupMessageListener();
   elements.sendButton.addEventListener('click', sendMessage);
 
-  const welcomeMessage = hasValidKey
-    ? 'Ready. I can help you read pages, click elements, and navigate the web.'
-    : 'Please configure an API key (Gemini or OpenRouter) in settings to get started.';
-
-  addMessage('system', welcomeMessage);
+  // Set initial status
+  if (hasValidKey) {
+    setStatus('Ready', false);
+  } else {
+    setStatus('No API Key', false);
+  }
 }

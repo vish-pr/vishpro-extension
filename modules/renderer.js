@@ -5,16 +5,16 @@ export function renderExtractionItem(extraction) {
   const { text = '', links = [], buttons = [] } = extraction;
 
   return `
-    <div class="extraction-item" data-url="${extraction.url}" data-timestamp="${extraction.timestamp}">
-      <div class="extraction-item-header">
-        <div class="extraction-item-title">${extraction.title || 'Untitled'}</div>
-        <div class="extraction-item-time">${formatTimestamp(extraction.timestamp)}</div>
+    <div class="data-card" data-url="${extraction.url}" data-timestamp="${extraction.timestamp}">
+      <div class="data-card-header">
+        <div class="data-card-title">${extraction.title || 'Untitled'}</div>
+        <div class="data-card-time">${formatTimestamp(extraction.timestamp)}</div>
       </div>
-      <div class="extraction-item-url">${extraction.url}</div>
-      <div class="extraction-item-stats">
-        <span>${text.length} chars</span>
-        <span>${links.length} links</span>
-        <span>${buttons.length} buttons</span>
+      <div class="data-card-url">${extraction.url}</div>
+      <div class="data-card-stats">
+        <span class="stat"><span class="stat-value">${text.length}</span> chars</span>
+        <span class="stat"><span class="stat-value">${links.length}</span> links</span>
+        <span class="stat"><span class="stat-value">${buttons.length}</span> buttons</span>
       </div>
     </div>
   `;
@@ -51,7 +51,7 @@ export function renderExtractionDetail(extraction) {
       <div class="extraction-detail-header">
         <div class="extraction-detail-title">${extraction.title || 'Untitled'}</div>
         <div class="extraction-detail-url">${extraction.url}</div>
-        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 6px;">
           Extracted: ${formatTimestamp(extraction.timestamp)}
         </div>
       </div>
@@ -62,9 +62,9 @@ export function renderExtractionDetail(extraction) {
 
 export function renderActionHistoryItem(action) {
   return `
-    <div class="action-history-item">
-      <div class="action-history-time">${formatTimestamp(action.timestamp)}</div>
-      <div class="action-history-text">${action.description}</div>
+    <div class="action-log-item">
+      <div class="action-log-time">${formatTimestamp(action.timestamp)}</div>
+      <div class="action-log-text">${action.description}</div>
     </div>
   `;
 }

@@ -5,9 +5,9 @@ import { addMessage } from './chat.js';
 import { setApiKey } from './llm.js';
 
 const STATUS = {
-  VALID: { class: 'valid', icon: '✓', color: '#10b981' },
-  INVALID: { class: 'invalid', icon: '✗', color: '#ef4444' },
-  VERIFYING: { class: 'verifying', icon: '⏳', color: '#f59e0b' }
+  VALID: { class: 'valid', icon: '✓', color: '#34c759' },
+  INVALID: { class: 'invalid', icon: '✗', color: '#ff453a' },
+  VERIFYING: { class: 'verifying', icon: '⏳', color: '#ff9f0a' }
 };
 
 function updateApiKeyStatus(provider, status) {
@@ -30,11 +30,20 @@ function updateApiKeyStatus(provider, status) {
 }
 
 function updateHeaderTitle() {
-  // Check if any provider is configured
+  // Check if any provider is configured and update status indicator
   storage.get(['geminiApiKeyValid', 'openrouterApiKeyValid']).then(({ geminiApiKeyValid, openrouterApiKeyValid }) => {
     const isVerified = geminiApiKeyValid || openrouterApiKeyValid;
-    elements.headerTitle.textContent = isVerified ? 'VishPro Agent ✓' : 'VishPro Agent';
-    elements.headerTitle.style.color = isVerified ? '#10b981' : '#e0e0e0';
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+
+    if (statusDot) {
+      statusDot.classList.toggle('active', isVerified);
+    }
+    if (statusText && !isVerified) {
+      statusText.textContent = 'No API Key';
+    } else if (statusText) {
+      statusText.textContent = 'Ready';
+    }
   });
 }
 

@@ -6,10 +6,9 @@ import { renderTemplate, resolveSystemPrompt } from './templates.js';
 import logger from '../logger.js';
 import { getBrowserStateBundle } from '../browser-state.js';
 import { generate } from '../llm.js';
-import { browserActions } from '../actions/browser-actions.js';
+import { browserActions, browserActionRouter } from '../actions/browser-actions.js';
 import { chatAction, CHAT_RESPONSE } from '../actions/chat-action.js';
 import { routerAction } from '../actions/router-action.js';
-import { browserActionRouter } from '../actions/browser-action-router.js';
 
 const STEP_TIMEOUT_MS = 20000;
 const LLM_TIMEOUT_MS = 40000;

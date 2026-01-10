@@ -16,9 +16,9 @@ export function switchToTab(tabName) {
 }
 
 function showTabContent(tabName) {
-  elements.currentTabContent.style.display = tabName === TABS.CURRENT ? 'block' : 'none';
-  elements.historyTabContent.style.display = tabName === TABS.HISTORY ? 'block' : 'none';
-  elements.actionsTabContent.style.display = tabName === TABS.ACTIONS ? 'block' : 'none';
+  elements.currentTabContent.classList.toggle('active', tabName === TABS.CURRENT);
+  elements.historyTabContent.classList.toggle('active', tabName === TABS.HISTORY);
+  elements.actionsTabContent.classList.toggle('active', tabName === TABS.ACTIONS);
 }
 
 async function loadCurrentPage() {
@@ -85,7 +85,7 @@ async function showExtractionDetail(url, timestamp) {
 }
 
 function attachHistoryItemListeners() {
-  elements.historyTabContent.querySelectorAll('.extraction-item').forEach(item => {
+  elements.historyTabContent.querySelectorAll('.data-card').forEach(item => {
     item.addEventListener('click', () => {
       showExtractionDetail(item.dataset.url, item.dataset.timestamp);
     });
@@ -99,7 +99,7 @@ function setupHistoryToggle() {
     elements.historyToggle.classList.toggle('active');
 
     if (isHidden) {
-      const activeTab = document.querySelector('.extraction-tab.active').dataset.tab;
+      const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
       await loadTabContent(activeTab);
     }
   });
