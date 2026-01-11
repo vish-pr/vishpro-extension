@@ -44,8 +44,7 @@ User Request
 
 ### State Management
 - **browser-state.js** - Tracks tabs, URLs, page content
-  - `formatSummary()` - Minimal state for tier-1
-  - `formatForChat()` - Full state for tier-2
+  - `formatForChat()` - Formatted browser state for LLM context
   - `extractAndStoreContent()` - Runs content extraction
   - `clickElement()`, `fillForm()`, `navigateTo()` - Browser operations
 

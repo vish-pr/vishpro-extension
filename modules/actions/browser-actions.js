@@ -25,7 +25,7 @@ async function executeScript(tabId, func, args = []) {
  */
 export const READ_PAGE = {
   name: 'READ_PAGE',
-  description: 'Extract page content including title, text, links, buttons, and form inputs',
+  description: 'Extract page content including title, text, links, buttons, and form inputs. Use when you need to see what is on the page or find elements to interact with. Returns element IDs that are required for CLICK_ELEMENT, FILL_FORM, and other interaction actions.',
   input_schema: {
     type: 'object',
     properties: {
@@ -55,7 +55,7 @@ export const READ_PAGE = {
  */
 export const CLICK_ELEMENT = {
   name: 'CLICK_ELEMENT',
-  description: 'Click an element on the page using an element ID from READ_PAGE, with optional modifiers for opening in new tabs or downloading',
+  description: 'Click a button, link, or interactive element using its element ID from READ_PAGE. Supports modifiers: newTab (open in background tab), newTabActive (open in foreground tab), download (download instead of navigate). Requires elementId from READ_PAGE results.',
   input_schema: {
     type: 'object',
     properties: {
@@ -106,7 +106,7 @@ export const CLICK_ELEMENT = {
  */
 export const NAVIGATE_TO = {
   name: 'NAVIGATE_TO',
-  description: 'Navigate to a different URL',
+  description: 'Navigate the browser to a specific URL. Use when user provides a URL or you need to go to a known address. Requires full URL with protocol (e.g., https://example.com).',
   input_schema: {
     type: 'object',
     properties: {
@@ -140,7 +140,7 @@ export const NAVIGATE_TO = {
  */
 export const GET_PAGE_STATE = {
   name: 'GET_PAGE_STATE',
-  description: 'Get current page state including scroll position, viewport size, and load status',
+  description: 'Get current page state including scroll position (scroll_x, scroll_y), viewport dimensions, total page size, and load status. Use to check if page is fully loaded or to determine scroll position before scrolling.',
   input_schema: {
     type: 'object',
     properties: {
@@ -182,7 +182,7 @@ export const GET_PAGE_STATE = {
  */
 export const FILL_FORM = {
   name: 'FILL_FORM',
-  description: 'Fill multiple form fields with values and optionally submit',
+  description: 'Fill one or more form input fields with values. Requires form_fields array with [{elementId, value}] where elementId comes from READ_PAGE. Can optionally submit the form by setting submit=true and providing submit_element_id.',
   input_schema: {
     type: 'object',
     properties: {
@@ -237,7 +237,7 @@ export const FILL_FORM = {
  */
 export const SELECT_OPTION = {
   name: 'SELECT_OPTION',
-  description: 'Select an option from a dropdown menu',
+  description: 'Select an option from a dropdown/select element. Requires elementId of the select element from READ_PAGE and the value or visible text of the option to select.',
   input_schema: {
     type: 'object',
     properties: {
@@ -301,7 +301,7 @@ export const SELECT_OPTION = {
  */
 export const CHECK_CHECKBOX = {
   name: 'CHECK_CHECKBOX',
-  description: 'Check or uncheck a checkbox',
+  description: 'Check or uncheck a checkbox input. Requires elementId from READ_PAGE and checked (true to check, false to uncheck).',
   input_schema: {
     type: 'object',
     properties: {
@@ -355,7 +355,7 @@ export const CHECK_CHECKBOX = {
  */
 export const SUBMIT_FORM = {
   name: 'SUBMIT_FORM',
-  description: 'Submit a form',
+  description: 'Submit a form by clicking a submit button or triggering form submission. Requires elementId of a submit button or form element from READ_PAGE.',
   input_schema: {
     type: 'object',
     properties: {
@@ -411,7 +411,7 @@ export const SUBMIT_FORM = {
  */
 export const SCROLL_TO = {
   name: 'SCROLL_TO',
-  description: 'Scroll the page up, down, to top, to bottom, or by specific pixels',
+  description: 'Scroll the page in a direction. Requires direction: "up", "down", "top", or "bottom". Optional pixels parameter (default 500) for up/down. Optional wait_ms (default 500) to wait for content to load after scrolling.',
   input_schema: {
     type: 'object',
     properties: {
@@ -459,7 +459,7 @@ export const SCROLL_TO = {
  */
 export const WAIT_FOR_LOAD = {
   name: 'WAIT_FOR_LOAD',
-  description: 'Wait for the page to finish loading',
+  description: 'Wait for the page to finish loading (document.readyState === "complete"). Use after navigation or clicking links that cause page loads. Optional timeout_ms (default 10000).',
   input_schema: {
     type: 'object',
     properties: {
@@ -519,7 +519,7 @@ export const WAIT_FOR_LOAD = {
  */
 export const WAIT_FOR_ELEMENT = {
   name: 'WAIT_FOR_ELEMENT',
-  description: 'Wait for a specific element to appear on the page',
+  description: 'Wait for a specific element to appear on the page. Use when expecting dynamic content to load. Requires elementId from a previous READ_PAGE. Optional timeout_ms (default 5000).',
   input_schema: {
     type: 'object',
     properties: {
@@ -584,7 +584,7 @@ export const WAIT_FOR_ELEMENT = {
  */
 export const GO_BACK = {
   name: 'GO_BACK',
-  description: 'Navigate back one page in browser history',
+  description: 'Navigate back one page in browser history. Use when user wants to go back or undo a navigation.',
   input_schema: {
     type: 'object',
     properties: {
@@ -614,7 +614,7 @@ export const GO_BACK = {
  */
 export const GO_FORWARD = {
   name: 'GO_FORWARD',
-  description: 'Navigate forward one page in browser history',
+  description: 'Navigate forward one page in browser history. Use after GO_BACK to return to a page.',
   input_schema: {
     type: 'object',
     properties: {
@@ -668,46 +668,7 @@ const BROWSER_ACTION_SYSTEM_PROMPT = `You are a browser automation assistant exe
 
 **Available Actions:**
 
-1. **READ_PAGE**: Extract page content (text, links, buttons, forms)
-   - Use when: Need to see what's on the page or find elements
-   - Returns: Page title, text, links (with IDs), buttons (with IDs), inputs (with IDs)
-
-2. **CLICK_ELEMENT**: Click an element by its ID
-   - Use when: Need to click a button, link, or interactive element
-   - Requires: elementId (from READ_PAGE results)
-   - Options: newTab (background), newTabActive (foreground), download
-
-3. **FILL_FORM**: Fill form fields with values
-   - Use when: Need to enter text in input fields
-   - Requires: form_fields array with [{elementId, value}]
-   - Options: submit (bool), submit_element_id
-
-4. **SELECT_OPTION**: Select from dropdown
-   - Requires: elementId, value (option text or value)
-
-5. **CHECK_CHECKBOX**: Toggle checkbox state
-   - Requires: elementId, checked (true/false)
-
-6. **SUBMIT_FORM**: Submit a form
-   - Requires: elementId (submit button or form)
-
-7. **NAVIGATE_TO**: Go to a URL
-   - Requires: url (include https://)
-
-8. **SCROLL_TO**: Scroll the page
-   - Requires: direction (up/down/top/bottom)
-   - Options: pixels (default 500), wait_ms
-
-9. **WAIT_FOR_LOAD**: Wait for page to load
-   - Options: timeout_ms (default 10000)
-
-10. **WAIT_FOR_ELEMENT**: Wait for element to appear
-    - Requires: elementId, timeout_ms
-
-11. **GO_BACK** / **GO_FORWARD**: Browser history navigation
-
-12. **CHAT_RESPONSE**: Respond to user [STOP]
-    - Use when: Task complete or need to communicate
+{{available_tools}}
 
 **Workflow:**
 1. Usually start with READ_PAGE to see the page
@@ -726,7 +687,12 @@ const BROWSER_ACTION_SYSTEM_PROMPT = `You are a browser automation assistant exe
  */
 export const browserActionRouter = {
   name: BROWSER_ACTION,
-  description: 'Execute browser actions (read, click, fill, navigate, scroll). Use this when you need to interact with web pages.',
+  description: 'Interact with web pages - read content, click elements, fill forms, navigate URLs, scroll, and wait for page loads. Use when the user wants to read page content, click buttons/links, fill inputs, navigate to URLs, or perform any browser interaction.',
+  examples: [
+    'What is this page?',
+    'Click the login button',
+    'Fill in my email'
+  ],
   input_schema: {
     type: 'object',
     properties: {

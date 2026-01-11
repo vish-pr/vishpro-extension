@@ -31,7 +31,11 @@ Be natural and conversational.`;
  */
 export const chatAction = {
   name: CHAT_RESPONSE,
-  description: 'Generate a natural language response to the user. Use this when the task is complete or you need to communicate with the user.',
+  description: 'Respond directly to the user with a natural language message. Use when: task is complete and you need to report results, the request is conversational or general knowledge, you need to ask the user for clarification, or no browser interaction is needed.',
+  examples: [
+    'How are you?',
+    'What can you do?'
+  ],
   input_schema: {
     type: 'object',
     properties: {

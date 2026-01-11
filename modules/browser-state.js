@@ -306,32 +306,6 @@ export class BrowserState {
   }
 
   /**
-   * Format a minimal summary of browser state for tier-1 routing
-   * Just shows tab URLs without detailed page content
-   * @returns {string} Brief summary of browser state
-   */
-  formatSummary() {
-    const lines = ['Browser State (summary):'];
-    lines.push(`Current Tab: ${this.currentTabId} (${this.currentTabUrl || 'unknown'})`);
-
-    if (this.tabs.size > 0) {
-      lines.push('Tracked Tabs:');
-      for (const [tabId, tab] of this.tabs) {
-        const isCurrent = tabId === this.currentTabId ? ' [CURRENT]' : '';
-        lines.push(`  Tab ${tabId}${isCurrent}: ${tab.currentUrl}`);
-        if (tab.pageContents.length > 0) {
-          const current = tab.pageContents.filter(pc => pc.status === 'current');
-          if (current.length > 0) {
-            lines.push(`    - Has extracted content (${current[0].content.links?.length || 0} links, ${current[0].content.buttons?.length || 0} buttons)`);
-          }
-        }
-      }
-    }
-    lines.push('\nUse BROWSER_ACTION to interact with web pages.');
-    return lines.join('\n');
-  }
-
-  /**
    * Format browser state for chat context
    * Returns a formatted string representation suitable for LLM context
    * When a tab is expanded (via setExpandedTab), shows full page content for that tab
@@ -755,19 +729,14 @@ export function getBrowserState() {
 }
 
 /**
- * Get browser state in all formats (formatted, JSON, instance)
+ * Get formatted browser state for LLM context
  * Waits for initialization to complete before returning
- * @returns {Promise<Object>} Object containing formatted, summary, json, and instance
+ * @returns {Promise<string>} Formatted browser state string
  */
 export async function getBrowserStateBundle() {
   const state = getBrowserState();
   await state.ready();
-  return {
-    formatted: state.formatForChat(),
-    summary: state.formatSummary(),
-    json: state.toJSON(),
-    instance: state
-  };
+  return state.formatForChat();
 }
 
 /**

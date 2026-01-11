@@ -1,6 +1,7 @@
 // Chat Functionality
 import { elements } from './dom.js';
 import { logAction } from './storage.js';
+import { renderMarkdown } from './markdown.js';
 
 function clearEmptyState() {
   const emptyState = elements.chatContainer.querySelector('.empty-state');
@@ -28,7 +29,7 @@ export function addMessage(role, content) {
 
   const bubbleDiv = document.createElement('div');
   bubbleDiv.className = 'message-bubble';
-  bubbleDiv.textContent = content;
+  bubbleDiv.innerHTML = renderMarkdown(content);
 
   messageDiv.appendChild(bubbleDiv);
   elements.chatContainer.appendChild(messageDiv);

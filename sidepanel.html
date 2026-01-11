@@ -691,6 +691,27 @@
       font-size: 10px;
     }
 
+    /* Markdown in messages */
+    .message-bubble strong {
+      font-weight: 600;
+    }
+
+    .message-bubble em {
+      font-style: italic;
+    }
+
+    .message-bubble code {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 12px;
+    }
+
+    .message.user .message-bubble code {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
     /* Utilities */
     .hidden { display: none !important; }
     .api-key-status { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; pointer-events: none; }

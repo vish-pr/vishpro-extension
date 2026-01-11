@@ -49,7 +49,7 @@ export async function executeAction(action, params = {}) {
 
 async function executeStep(step, params, prevResult) {
   if (typeof step === 'function') {
-    return withTimeout(step(params, prevResult, await getBrowserStateBundle()), STEP_TIMEOUT_MS);
+    return withTimeout(step(params, prevResult), STEP_TIMEOUT_MS);
   }
   if (step.action) {
     const subAction = actionsRegistry[step.action];
@@ -62,34 +62,32 @@ async function executeStep(step, params, prevResult) {
 
 async function executeLLMStep(step, params) {
   const { llm, choice } = step;
-  const browser = await getBrowserStateBundle();
-  const useSummary = step.use_browser_summary === true;
-  const browserStateText = useSummary ? browser.summary : browser.formatted;
 
-  const templateCtx = {
-    ...params,
-    browser_state_formatted: browser.formatted,
-    browser_state_summary: browser.summary,
-    browser_state_json: browser.json
-  };
+  const templateCtx = { ...params };
+
+  // Inject available_tools and decision_guide for actions with choice
+  if (choice?.available_actions) {
+    templateCtx.available_tools = buildToolDescriptions(choice.available_actions, choice.stop_action);
+    templateCtx.decision_guide = buildDecisionGuide(choice.available_actions);
+  }
 
   const systemPrompt = await resolveSystemPrompt(llm.system_prompt, templateCtx, generate);
   const message = renderTemplate(llm.message, templateCtx);
 
   if (!choice) {
-    const messages = insertBrowserStateMessage([
+    const messages = await insertBrowserState([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: message }
-    ], browserStateText);
+    ]);
     return withTimeout(
       generate({ messages, intelligence: llm.intelligence || 'MEDIUM', schema: llm.schema }),
       LLM_TIMEOUT_MS
     );
   }
-  return executeMultiTurn(systemPrompt, message, choice, llm.intelligence, useSummary);
+  return executeMultiTurn(systemPrompt, message, choice, llm.intelligence);
 }
 
-async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligence, useSummary = false) {
+async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligence) {
   const { available_actions, stop_action = CHAT_RESPONSE, max_iterations = 5 } = choice;
   const conversation = [
     { role: 'system', content: systemPrompt },
@@ -99,10 +97,7 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
 
   for (let i = 0; i < max_iterations; i++) {
     logger.info(`Turn ${i + 1}/${max_iterations}`);
-    const browser = await getBrowserStateBundle();
-    const messagesWithBrowser = insertBrowserStateMessage(
-      conversation, useSummary ? browser.summary : browser.formatted
-    );
+    const messagesWithBrowser = await insertBrowserState(conversation);
 
     const llmChoice = await withTimeout(
       generate({
@@ -171,10 +166,11 @@ function formatConversationHistory(history) {
   }).join('\n\n');
 }
 
-function insertBrowserStateMessage(conversation, browserFormatted) {
+async function insertBrowserState(conversation) {
+  const browserState = await getBrowserStateBundle();
   const copy = conversation.map(m => ({ ...m }));
   const lastUserIdx = copy.findLastIndex(m => m.role === 'user');
-  const browserMsg = { role: 'user', content: `Current Browser State:\n${browserFormatted}` };
+  const browserMsg = { role: 'user', content: `Current Browser State:\n${browserState}` };
   lastUserIdx > 0 ? copy.splice(lastUserIdx, 0, browserMsg) : copy.push(browserMsg);
   return copy;
 }
@@ -184,7 +180,8 @@ function buildChoiceSchema(availableActions) {
     tool: { type: 'string', enum: availableActions, description: 'The tool to use' },
     justification: { type: 'string', description: 'Why this tool is appropriate' },
     instructions: { type: 'string', description: 'Instructions for the tool' },
-    notes: { type: 'string', description: 'Additional context' }
+    notes: { type: 'string', description: 'Additional context' },
+    user_message: { type: 'string', description: 'The user message being processed' }
   };
   for (const name of availableActions) {
     const action = actionsRegistry[name];
@@ -194,7 +191,40 @@ function buildChoiceSchema(availableActions) {
       }
     }
   }
+  // Only require base fields; action-specific required fields validated in executeAction
   return { type: 'object', properties, required: ['tool', 'justification', 'instructions', 'user_message'], additionalProperties: false };
+}
+
+/**
+ * Build formatted tool descriptions from action names
+ * Used for dynamic system prompt generation in actions with choice
+ */
+function buildToolDescriptions(actionNames, stopAction) {
+  return actionNames.map((name, index) => {
+    const action = actionsRegistry[name];
+    const stopMarker = name === stopAction ? ' [STOP]' : '';
+    const requiredFields = action?.input_schema?.required?.length
+      ? `\n   Requires: ${action.input_schema.required.join(', ')}`
+      : '';
+    return `${index + 1}. **${name}**${stopMarker}: ${action?.description || 'No description'}${requiredFields}`;
+  }).join('\n\n');
+}
+
+/**
+ * Build decision guide from action examples
+ * Maps example queries to their target actions
+ */
+function buildDecisionGuide(actionNames) {
+  const lines = [];
+  for (const name of actionNames) {
+    const action = actionsRegistry[name];
+    if (action?.examples) {
+      for (const example of action.examples) {
+        lines.push(`- "${example}" → ${name}`);
+      }
+    }
+  }
+  return lines.join('\n');
 }
 
 const withTimeout = (promise, ms) => Promise.race([

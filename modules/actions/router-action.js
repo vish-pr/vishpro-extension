@@ -13,29 +13,16 @@ import { CHAT_RESPONSE } from './chat-action.js';
 export const BROWSER_ROUTER = 'BROWSER_ROUTER';
 
 /**
- * Simplified tier-1 system prompt
- * Does NOT include detailed browser action info - that's in tier-2
+ * Tier-1 system prompt - uses {{available_tools}} injected by executor
  */
 const TIER1_SYSTEM_PROMPT = `You are an assistant that helps users with their requests.
 
 **Available Tools:**
 
-1. **BROWSER_ACTION**: Interact with web pages
-   - Use when: User wants to read page content, click elements, fill forms, navigate, scroll, or perform any browser interaction
-   - Capabilities: Extract page content, click buttons/links, fill forms, select dropdowns, navigate URLs, scroll pages, wait for elements
-   - Choose this if the user's request involves understanding or manipulating what's in the browser
-
-2. **CHAT_RESPONSE**: Respond directly to user [STOP]
-   - Use when: You can answer the question without browser interaction
-   - Use when: The request is conversational, a clarification, or general knowledge
-   - Use when: You need to ask the user for more information
+{{available_tools}}
 
 **Decision Guide:**
-- "What is this page?" → BROWSER_ACTION (need to read the page)
-- "Click the login button" → BROWSER_ACTION (need to interact)
-- "Fill in my email" → BROWSER_ACTION (need to fill form)
-- "How are you?" → CHAT_RESPONSE (conversational)
-- "What can you do?" → CHAT_RESPONSE (general question)
+{{decision_guide}}
 
 Choose the appropriate tool for the user's request.`;
 
@@ -45,7 +32,7 @@ Choose the appropriate tool for the user's request.`;
  */
 export const routerAction = {
   name: BROWSER_ROUTER,
-  description: 'Routes user requests - browser actions or direct response',
+  description: 'Top-level router that decides whether a user request needs browser interaction or can be answered directly. Routes to BROWSER_ACTION for page reading, clicking, form filling, navigation, or CHAT_RESPONSE for conversational replies.',
   input_schema: {
     type: 'object',
     properties: {
@@ -81,9 +68,7 @@ What tool should you use to handle this request?`,
           CHAT_RESPONSE
         ],
         stop_action: CHAT_RESPONSE
-      },
-      // Flag to use summary browser state (not full details)
-      use_browser_summary: true
+      }
     }
   ]
 };
