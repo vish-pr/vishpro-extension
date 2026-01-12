@@ -75,14 +75,32 @@ async function executeLLMStep(step, params) {
   const message = renderTemplate(llm.message, templateCtx);
 
   if (!choice) {
+    // Single LLM call with schema - wrap schema in a tool
+    const tools = [{
+      type: 'function',
+      function: {
+        name: 'respond',
+        description: 'Generate structured response',
+        parameters: llm.schema
+      }
+    }];
+
     const messages = await insertBrowserState([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: message }
     ]);
-    return withTimeout(
-      generate({ messages, intelligence: llm.intelligence || 'MEDIUM', schema: llm.schema }),
+
+    const result = await withTimeout(
+      generate({ messages, intelligence: llm.intelligence || 'MEDIUM', tools }),
       LLM_TIMEOUT_MS
     );
+
+    // Extract arguments from tool call
+    if (result.tool_calls?.length) {
+      return JSON.parse(result.tool_calls[0].function.arguments || '{}');
+    }
+    // Fallback if no tool call
+    return result.content ? { response: result.content, success: true } : result;
   }
   return executeMultiTurn(systemPrompt, message, choice, llm.intelligence);
 }
@@ -94,51 +112,97 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
     { role: 'user', content: initialMessage }
   ];
   const fullHistory = [];
+  const tools = buildTools(available_actions);
 
   for (let i = 0; i < max_iterations; i++) {
     logger.info(`Turn ${i + 1}/${max_iterations}`);
     const messagesWithBrowser = await insertBrowserState(conversation);
 
-    const llmChoice = await withTimeout(
+    const llmResponse = await withTimeout(
       generate({
         messages: messagesWithBrowser,
         intelligence: intelligence || 'MEDIUM',
-        schema: buildChoiceSchema(available_actions)
+        tools
       }),
       LLM_TIMEOUT_MS
     );
 
-    logger.info(`Chose: ${llmChoice.tool}`);
-    conversation.push({ role: 'assistant', content: JSON.stringify(llmChoice, null, 2) });
-    fullHistory.push({ turn: i + 1, action: llmChoice.tool, params: llmChoice, timestamp: new Date().toISOString() });
+    // Handle tool calls response
+    if (!llmResponse.tool_calls?.length) {
+      // No tool call - model returned content directly
+      logger.warn('LLM returned content instead of tool call', { content: llmResponse.content });
+      return executeAction(actionsRegistry[stop_action], { response: llmResponse.content || 'No response' });
+    }
 
-    const targetAction = actionsRegistry[llmChoice.tool];
-    if (!targetAction) throw new Error(`Action not found: ${llmChoice.tool}`);
+    const toolCall = llmResponse.tool_calls[0];
+    const toolName = toolCall.function.name;
+    const toolArgs = JSON.parse(toolCall.function.arguments || '{}');
 
-    const actionParams = pickParams(llmChoice, targetAction);
-    if (llmChoice.tool === stop_action) {
+    logger.info(`Tool call: ${toolName}`, { id: toolCall.id });
+
+    // Store assistant message with tool_calls
+    conversation.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: llmResponse.tool_calls
+    });
+
+    fullHistory.push({
+      turn: i + 1,
+      action: toolName,
+      params: toolArgs,
+      tool_call_id: toolCall.id,
+      timestamp: new Date().toISOString()
+    });
+
+    const targetAction = actionsRegistry[toolName];
+    if (!targetAction) {
+      // Tool not found - send error as tool response
+      conversation.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify({ error: `Action not found: ${toolName}` })
+      });
+      continue;
+    }
+
+    const actionParams = pickParams(toolArgs, targetAction);
+    if (toolName === stop_action) {
       actionParams.conversation_history = formatConversationHistory(fullHistory);
     }
 
     try {
       const result = await executeAction(targetAction, actionParams);
-      if (llmChoice.tool === stop_action) return result;
+      if (toolName === stop_action) return result;
+
       fullHistory[fullHistory.length - 1].result = result;
-      conversation.push({ role: 'user', content: `Result:\n${JSON.stringify(result, null, 2)}` });
+
+      // Send result as tool response
+      conversation.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(result, null, 2)
+      });
     } catch (error) {
-      if (error.isValidationError) {
-        logger.warn(`${llmChoice.tool} validation failed`, { errors: error.validationErrors });
-        fullHistory[fullHistory.length - 1].error = error.validationErrors.join(', ');
-        conversation.push({
-          role: 'user',
-          content: `Error: ${llmChoice.tool} validation failed.\nErrors: ${error.validationErrors.join(', ')}\nPlease fix and retry.`
-        });
-        continue;
-      }
-      throw error;
+      const errorContent = error.isValidationError
+        ? { error: 'Validation failed', details: error.validationErrors }
+        : { error: error.message };
+
+      logger.warn(`${toolName} failed`, errorContent);
+      fullHistory[fullHistory.length - 1].error = error.message;
+
+      // Send error as tool response
+      conversation.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(errorContent)
+      });
     }
 
-    if (conversation.length > 10) conversation.splice(2, conversation.length - 8);
+    // Trim conversation if too long (keep system + first user + last 8 messages)
+    if (conversation.length > 12) {
+      conversation.splice(2, conversation.length - 10);
+    }
   }
 
   logger.warn('Max iterations reached');
@@ -175,24 +239,37 @@ async function insertBrowserState(conversation) {
   return copy;
 }
 
-function buildChoiceSchema(availableActions) {
-  const properties = {
-    tool: { type: 'string', enum: availableActions, description: 'The tool to use' },
-    justification: { type: 'string', description: 'Why this tool is appropriate' },
-    instructions: { type: 'string', description: 'Instructions for the tool' },
-    notes: { type: 'string', description: 'Additional context' },
-    user_message: { type: 'string', description: 'The user message being processed' }
-  };
-  for (const name of availableActions) {
+/**
+ * Convert action definitions to OpenRouter tools format
+ * @param {string[]} availableActions - Action names to include
+ * @returns {Array} Tools array for OpenRouter
+ */
+function buildTools(availableActions) {
+  return availableActions.map(name => {
     const action = actionsRegistry[name];
-    if (action?.input_schema?.properties) {
-      for (const [key, prop] of Object.entries(action.input_schema.properties)) {
-        if (!properties[key]) properties[key] = prop;
+    if (!action) return null;
+
+    // Clone the input_schema and add common fields
+    const parameters = {
+      type: 'object',
+      properties: {
+        justification: { type: 'string', description: 'Why this tool is appropriate' },
+        instructions: { type: 'string', description: 'Instructions for the tool' },
+        ...(action.input_schema?.properties || {})
+      },
+      required: ['justification', 'instructions', ...(action.input_schema?.required || [])],
+      additionalProperties: false
+    };
+
+    return {
+      type: 'function',
+      function: {
+        name: action.name,
+        description: action.description || `Execute ${action.name}`,
+        parameters
       }
-    }
-  }
-  // Only require base fields; action-specific required fields validated in executeAction
-  return { type: 'object', properties, required: ['tool', 'justification', 'instructions', 'user_message'], additionalProperties: false };
+    };
+  }).filter(Boolean);
 }
 
 /**

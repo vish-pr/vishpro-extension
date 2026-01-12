@@ -15,19 +15,14 @@ export const elements = {
   actionsTabContent: document.getElementById('actionsTabContent'),
   extractionTabs: document.querySelectorAll('.tab-btn'),
 
-  // Provider settings
-  providerSelect: document.getElementById('providerSelect'),
-  geminiSettings: document.getElementById('geminiSettings'),
-  openrouterSettings: document.getElementById('openrouterSettings'),
-
-  // Gemini settings
-  geminiApiKey: document.getElementById('geminiApiKey'),
-  geminiApiKeyStatus: document.getElementById('geminiApiKeyStatus'),
-
   // OpenRouter settings
   openrouterApiKey: document.getElementById('openrouterApiKey'),
   openrouterApiKeyStatus: document.getElementById('openrouterApiKeyStatus'),
 
-  // Intelligence level
-  intelligenceSelect: document.getElementById('intelligenceSelect')
+  // Model configuration
+  modelsBody: document.getElementById('modelsBody'),
+  modelListHigh: document.getElementById('modelListHigh'),
+  modelListMedium: document.getElementById('modelListMedium'),
+  modelListLow: document.getElementById('modelListLow'),
+  resetModelsBtn: document.getElementById('resetModelsBtn')
 };

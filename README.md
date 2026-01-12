@@ -55,9 +55,7 @@ User Request
 - Handles clicks, form fills, scrolling
 
 ### LLM System (`modules/`)
-- **llm.js** - Unified LLM interface with failover
-- **llm-config.js** - Model tiers (HIGH/MEDIUM/LOW)
-- **llm-client.js** - OpenRouter & Gemini API clients
+- **llm.js** - OpenRouter client with model tiers and cascading failover
 
 ## Data Flow
 
@@ -75,7 +73,7 @@ User Request
 ## Quick Start
 
 1. Load extension in `chrome://extensions/` (Developer mode)
-2. Click extension → Settings → Add API key (Gemini or OpenRouter)
+2. Click extension → Settings → Add OpenRouter API key
 3. Chat: "Read this page", "Click the login button", etc.
 
 ## File Structure
@@ -90,9 +88,8 @@ extension/
 │   │   ├── browser-actions.js # Tier-2 router + 13 action definitions
 │   │   └── chat-action.js    # Response generation
 │   ├── browser-state.js      # Tab/page state management
-│   ├── llm.js               # LLM interface
-│   ├── llm-config.js        # Model configuration
-│   └── logger.js            # Logging system
+│   ├── llm.js                # OpenRouter client + model config
+│   └── logger.js             # Logging system
 ├── content.js               # Page interaction script
 ├── background.js            # Service worker
 ├── sidepanel.js/html        # Chat UI
@@ -115,9 +112,8 @@ extension/
 | WAIT_FOR_ELEMENT | Wait for element to appear |
 | GO_BACK/GO_FORWARD | Browser history navigation |
 
-## LLM Providers
+## LLM Provider
 
-- **Gemini** (Google AI Studio) - Free tier available
-- **OpenRouter** - Multiple models, pay-as-you-go
+Uses **OpenRouter** for access to multiple models (Gemini, Llama, Qwen, etc.)
 
 Intelligence levels: LOW (fast), MEDIUM (balanced), HIGH (quality)

@@ -160,7 +160,8 @@
 
     /* Settings */
     .settings {
-      max-height: 300px;
+      max-height: 500px;
+      overflow-y: auto;
     }
 
     .form-group {
@@ -715,6 +716,319 @@
     /* Utilities */
     .hidden { display: none !important; }
     .api-key-status { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; pointer-events: none; }
+
+    /* Model Configuration */
+    .models-section {
+      margin-top: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+
+    .models-header {
+      padding: 6px 0;
+    }
+
+    .models-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .models-body {
+      padding-top: 10px;
+    }
+
+    .tier-section {
+      margin-bottom: 12px;
+    }
+
+    .tier-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .tier-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .tier-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 3px 8px;
+      border-radius: 3px;
+      background: var(--bg-input);
+    }
+
+    .tier-label.high { color: #ff6b6b; }
+    .tier-label.medium { color: #ffd43b; }
+    .tier-label.low { color: #69db7c; }
+
+    .tier-add-btn {
+      width: 22px;
+      height: 22px;
+      background: transparent;
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .tier-add-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-subtle);
+    }
+
+    .model-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .model-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s;
+    }
+
+    .model-row.dragging {
+      opacity: 0.4;
+      position: relative;
+      z-index: 1;
+    }
+
+    .model-row.drag-above {
+      transform: translateY(46px);
+    }
+
+    .model-row.drag-below {
+      transform: translateY(-46px);
+    }
+
+    .drag-handle {
+      width: 20px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary);
+      cursor: grab;
+      opacity: 0.4;
+      transition: opacity 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .drag-handle:hover {
+      opacity: 1;
+      color: var(--accent);
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .model-item {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .model-row:hover .model-item {
+      border-color: var(--text-tertiary);
+    }
+
+    .model-row.dragging .model-item {
+      border-color: var(--accent);
+      box-shadow: 0 4px 12px rgba(110, 158, 255, 0.25);
+    }
+
+    .model-item.editing {
+      border-color: var(--accent);
+    }
+
+    .drop-indicator {
+      height: 2px;
+      background: var(--accent);
+      border-radius: 1px;
+      margin: -1px 0 -1px 20px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .drop-indicator.visible {
+      opacity: 1;
+    }
+
+    .model-list.drag-target {
+      min-height: 44px;
+      border-radius: var(--radius-sm);
+      transition: background 0.15s;
+    }
+
+    .model-list.drag-target.drag-over-empty {
+      background: var(--accent-subtle);
+    }
+
+    .model-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .model-name {
+      font-size: 12px;
+      font-family: 'SF Mono', Monaco, 'Consolas', monospace;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .model-name-input {
+      width: 100%;
+      padding: 4px 6px;
+      background: var(--bg-base);
+      border: 1px solid var(--border-focus);
+      border-radius: 3px;
+      color: var(--text-primary);
+      font-family: 'SF Mono', Monaco, 'Consolas', monospace;
+      font-size: 12px;
+    }
+
+    .model-name-input:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+
+    .model-provider {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .model-provider-input {
+      flex: 1;
+      padding: 3px 5px;
+      background: var(--bg-base);
+      border: 1px solid var(--border-focus);
+      border-radius: 3px;
+      color: var(--text-secondary);
+      font-size: 10px;
+    }
+
+    .model-provider-input:focus {
+      outline: none;
+    }
+
+    .provider-tag {
+      padding: 2px 6px;
+      background: var(--bg-hover);
+      border-radius: 3px;
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .model-actions {
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .model-row:hover .model-actions,
+    .model-item.editing .model-actions {
+      opacity: 1;
+    }
+
+    .model-btn {
+      width: 22px;
+      height: 22px;
+      background: transparent;
+      border: none;
+      border-radius: 3px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .model-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .model-btn.delete:hover {
+      background: rgba(255, 69, 58, 0.15);
+      color: var(--error);
+    }
+
+    .model-btn.save:hover {
+      background: var(--accent-subtle);
+      color: var(--accent);
+    }
+
+    .models-footer {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .reset-btn {
+      padding: 6px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .reset-btn:hover {
+      border-color: var(--text-tertiary);
+      color: var(--text-primary);
+    }
+
+    .empty-tier {
+      padding: 16px 20px;
+      text-align: center;
+      color: var(--text-tertiary);
+      font-size: 11px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-sm);
+      margin-left: 20px;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+
+    .model-list.drag-over-empty .empty-tier {
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+      color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -748,22 +1062,6 @@
   <div class="panel settings hidden" id="settingsPanel">
     <div class="panel-content">
       <div class="form-group">
-        <label class="form-label">Provider</label>
-        <select id="providerSelect" class="form-select">
-          <option value="gemini">Google Gemini</option>
-          <option value="openrouter">OpenRouter</option>
-        </select>
-      </div>
-
-      <div id="geminiSettings" class="form-group">
-        <label class="form-label">Gemini API Key</label>
-        <div class="input-wrapper">
-          <input type="password" id="geminiApiKey" class="form-input" placeholder="AIza...">
-          <span id="geminiApiKeyStatus" class="input-status api-key-status"></span>
-        </div>
-      </div>
-
-      <div id="openrouterSettings" class="form-group hidden">
         <label class="form-label">OpenRouter API Key</label>
         <div class="input-wrapper">
           <input type="password" id="openrouterApiKey" class="form-input" placeholder="sk-or-...">
@@ -771,17 +1069,56 @@
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Intelligence Level</label>
-        <select id="intelligenceSelect" class="form-select">
-          <option value="LOW">Low — Fast & Light</option>
-          <option value="MEDIUM" selected>Medium — Balanced</option>
-          <option value="HIGH">High — Best Quality</option>
-        </select>
+      <div class="form-note">
+        Get your API key from <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent);">openrouter.ai/keys</a>
       </div>
 
-      <div class="form-note">
-        Configure both providers for automatic failover support.
+      <!-- Model Configuration -->
+      <div class="models-section expanded" id="modelsSection">
+        <div class="models-header">
+          <span class="models-title">Models</span>
+        </div>
+        <div class="models-body" id="modelsBody">
+          <div class="tier-section" data-tier="HIGH">
+            <div class="tier-header">
+              <span class="tier-label high">High</span>
+              <button class="tier-add-btn" data-tier="HIGH" title="Add model">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+              </button>
+            </div>
+            <div class="model-list drag-target" id="modelListHigh"></div>
+          </div>
+
+          <div class="tier-section" data-tier="MEDIUM">
+            <div class="tier-header">
+              <span class="tier-label medium">Medium</span>
+              <button class="tier-add-btn" data-tier="MEDIUM" title="Add model">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+              </button>
+            </div>
+            <div class="model-list drag-target" id="modelListMedium"></div>
+          </div>
+
+          <div class="tier-section" data-tier="LOW">
+            <div class="tier-header">
+              <span class="tier-label low">Low</span>
+              <button class="tier-add-btn" data-tier="LOW" title="Add model">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+              </button>
+            </div>
+            <div class="model-list drag-target" id="modelListLow"></div>
+          </div>
+
+          <div class="models-footer">
+            <button class="reset-btn" id="resetModelsBtn">Reset to Defaults</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

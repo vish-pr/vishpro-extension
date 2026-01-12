@@ -24,10 +24,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     return true; // Keep channel open for async response
   } else if (message.action === 'verifyApiKey') {
-    logger.info('API Key Verification Request', { provider: message.provider });
-    verifyApiKey(message.apiKey, message.provider)
+    logger.info('API Key Verification Request');
+    verifyApiKey(message.apiKey)
       .then(result => {
-        logger.info('API Key Verification Result', { valid: result.valid, provider: message.provider });
+        logger.info('API Key Verification Result', { valid: result.valid });
         sendResponse(result);
       })
       .catch(error => {
@@ -42,9 +42,9 @@ async function handleUserMessage({ message }) {
   logger.info('Handling User Message', { userMessage: message });
 
   try {
-    // Check if any provider is initialized
+    // Check if OpenRouter is initialized
     if (!(await isInitialized())) {
-      throw new Error('No LLM provider configured. Please add an API key in settings.');
+      throw new Error('OpenRouter API key not configured. Please add your API key in settings.');
     }
 
     // Get the router action and execute it
@@ -69,10 +69,10 @@ async function handleUserMessage({ message }) {
   }
 }
 
-// Verify API key using unified LLM client
-async function verifyApiKey(apiKey, provider) {
+// Verify API key using OpenRouter client
+async function verifyApiKey(apiKey) {
   try {
-    const valid = await llmVerifyApiKey(apiKey, provider);
+    const valid = await llmVerifyApiKey(apiKey);
     if (valid) {
       return { valid: true };
     } else {

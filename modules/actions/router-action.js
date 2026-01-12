@@ -15,16 +15,12 @@ export const BROWSER_ROUTER = 'BROWSER_ROUTER';
 /**
  * Tier-1 system prompt - uses {{available_tools}} injected by executor
  */
-const TIER1_SYSTEM_PROMPT = `You are an assistant that helps users with their requests.
-
-**Available Tools:**
-
-{{available_tools}}
+const TIER1_SYSTEM_PROMPT = `You are a browser automation assistant. Execute the user's request by calling the appropriate tool.
 
 **Decision Guide:**
 {{decision_guide}}
 
-Choose the appropriate tool for the user's request.`;
+IMPORTANT: Always call a tool. Never explain which tool you would use - just use it.`;
 
 /**
  * BROWSER_ROUTER action (Tier-1)
@@ -57,9 +53,7 @@ export const routerAction = {
       // Tier-1 LLM choice: BROWSER_ACTION or CHAT_RESPONSE
       llm: {
         system_prompt: TIER1_SYSTEM_PROMPT,
-        message: `{{user_message}}
-
-What tool should you use to handle this request?`,
+        message: `{{user_message}}`,
         intelligence: 'MEDIUM'
       },
       choice: {

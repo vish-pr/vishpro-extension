@@ -664,22 +664,17 @@ export const browserActions = [
  */
 export const BROWSER_ACTION = 'BROWSER_ACTION';
 
-const BROWSER_ACTION_SYSTEM_PROMPT = `You are a browser automation assistant executing actions on web pages.
-
-**Available Actions:**
-
-{{available_tools}}
+const BROWSER_ACTION_SYSTEM_PROMPT = `You are a browser automation assistant. Execute actions on web pages by calling tools.
 
 **Workflow:**
-1. Usually start with READ_PAGE to see the page
-2. Use element IDs from READ_PAGE results for clicks/forms
+1. Start with READ_PAGE to see page content
+2. Use element IDs from READ_PAGE for clicks/forms
 3. Chain actions: READ_PAGE -> FILL_FORM -> CLICK_ELEMENT -> WAIT_FOR_LOAD
-4. End with CHAT_RESPONSE when done
+4. Call CHAT_RESPONSE when task is complete
 
-**Element IDs:**
-- READ_PAGE assigns numeric IDs to all interactive elements
-- Use these IDs (not CSS selectors) for CLICK_ELEMENT, FILL_FORM, etc.
-- IDs appear in browser state as [id] next to each element`;
+**Element IDs:** READ_PAGE assigns numeric IDs to elements. Use these IDs (not CSS selectors) for CLICK_ELEMENT, FILL_FORM, etc.
+
+Always call a tool. Never explain what you would do - just do it.`;
 
 /**
  * Browser action router (Tier-2)
