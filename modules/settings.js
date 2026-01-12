@@ -3,11 +3,12 @@ import { elements } from './dom.js';
 import * as storage from './storage.js';
 import { addMessage } from './chat.js';
 import { setApiKey, getModels, setModels, getDefaultModels } from './llm.js';
+import Sortable from 'sortablejs';
 
 const STATUS = {
-  VALID: { class: 'valid', icon: '✓', color: '#34c759' },
-  INVALID: { class: 'invalid', icon: '✗', color: '#ff453a' },
-  VERIFYING: { class: 'verifying', icon: '⏳', color: '#ff9f0a' }
+  VALID: { class: 'input-success', icon: '✓', color: 'oklch(0.7 0.2 145)' },
+  INVALID: { class: 'input-error', icon: '✗', color: 'oklch(0.65 0.25 25)' },
+  VERIFYING: { class: 'input-warning', icon: '⏳', color: 'oklch(0.75 0.18 85)' }
 };
 
 let currentModels = null;
@@ -16,7 +17,7 @@ function updateApiKeyStatus(status) {
   const input = elements.openrouterApiKey;
   const statusEl = elements.openrouterApiKeyStatus;
 
-  input.classList.remove('valid', 'invalid', 'verifying');
+  input.classList.remove('input-success', 'input-error', 'input-warning');
 
   if (status === true) status = STATUS.VALID;
   else if (status === false) status = STATUS.INVALID;
@@ -50,7 +51,13 @@ function updateHeaderTitle() {
 
 function toggleSettings(show) {
   elements.settingsPanel.classList.toggle('hidden', !show);
-  elements.settingsToggle.classList.toggle('active', show);
+  elements.settingsToggle.classList.toggle('btn-active', show);
+
+  // Close extraction panel when opening settings
+  if (show) {
+    elements.extractionPanel.classList.add('hidden');
+    elements.historyToggle.classList.remove('btn-active');
+  }
 }
 
 async function verifyApiKey(apiKey) {
@@ -92,37 +99,33 @@ async function verifyApiKey(apiKey) {
 // ============================================
 
 function renderModelItem(model, provider, tier, index) {
-  const providerTags = provider.map(p => `<span class="provider-tag">${p}</span>`).join('');
+  const providerTags = provider.map(p => `<span class="badge badge-ghost badge-xs">${p}</span>`).join(' ');
 
   return `
-    <div class="model-row" data-tier="${tier}" data-index="${index}">
-      <div class="drag-handle" draggable="true">
+    <li class="list-row items-center transition-all duration-200" data-tier="${tier}" data-index="${index}">
+      <div class="drag-handle cursor-grab opacity-40 hover:opacity-100 transition-opacity">
         <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
           <circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>
           <circle cx="2" cy="7" r="1.5"/><circle cx="8" cy="7" r="1.5"/>
           <circle cx="2" cy="12" r="1.5"/><circle cx="8" cy="12" r="1.5"/>
         </svg>
       </div>
-      <div class="model-item">
-        <div class="model-info">
-          <div class="model-name">${model}</div>
-          <div class="model-provider">${providerTags}</div>
-        </div>
-        <div class="model-actions">
-          <button class="model-btn edit" title="Edit">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
-          <button class="model-btn delete" title="Remove">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
+      <div class="list-col-grow min-w-0">
+        <div class="text-xs font-mono truncate">${model}</div>
+        <div class="flex gap-1 mt-0.5">${providerTags}</div>
       </div>
-    </div>
+      <button class="btn btn-ghost btn-xs btn-square edit" title="Edit">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+      <button class="btn btn-ghost btn-xs btn-square delete hover:btn-error" title="Remove">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </li>
   `;
 }
 
@@ -130,30 +133,26 @@ function renderEditingModelItem(model, provider, tier, index) {
   const providerStr = provider.join(', ');
 
   return `
-    <div class="model-row" data-tier="${tier}" data-index="${index}">
-      <div class="drag-handle-placeholder" style="width: 20px;"></div>
-      <div class="model-item editing">
-        <div class="model-info">
-          <input type="text" class="model-name-input" value="${model}" placeholder="model/name">
-          <div class="model-provider">
-            <span style="color: var(--text-tertiary);">via</span>
-            <input type="text" class="model-provider-input" value="${providerStr}" placeholder="provider">
-          </div>
-        </div>
-        <div class="model-actions">
-          <button class="model-btn save" title="Save">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 6L9 17l-5-5"/>
-            </svg>
-          </button>
-          <button class="model-btn cancel" title="Cancel">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-          </button>
+    <li class="list-row items-center bg-base-200" data-tier="${tier}" data-index="${index}">
+      <div class="w-[10px]"></div>
+      <div class="list-col-grow min-w-0 space-y-1">
+        <input type="text" class="model-name-input input input-xs input-bordered w-full font-mono" value="${model}" placeholder="model/name">
+        <div class="flex items-center gap-1">
+          <span class="text-[10px] opacity-50">via</span>
+          <input type="text" class="model-provider-input input input-xs input-bordered flex-1" value="${providerStr}" placeholder="provider">
         </div>
       </div>
-    </div>
+      <button class="btn btn-ghost btn-xs btn-square save hover:btn-success" title="Save">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </button>
+      <button class="btn btn-ghost btn-xs btn-square cancel" title="Cancel">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </li>
   `;
 }
 
@@ -162,7 +161,7 @@ function renderTierModels(tier) {
   const models = currentModels[tier] || [];
 
   if (models.length === 0) {
-    listEl.innerHTML = '<div class="empty-tier">No models configured</div>';
+    listEl.innerHTML = '<li class="text-center text-xs opacity-50 py-4">No models configured</li>';
     return;
   }
 
@@ -183,7 +182,7 @@ function handleModelEdit(tier, index) {
   const models = currentModels[tier];
   const [model, provider] = models[index];
   const listEl = elements[`modelList${tier.charAt(0) + tier.slice(1).toLowerCase()}`];
-  const row = listEl.querySelector(`.model-row[data-index="${index}"]`);
+  const row = listEl.querySelector(`.list-row[data-index="${index}"]`);
 
   row.outerHTML = renderEditingModelItem(model, provider, tier, index);
   listEl.querySelector('.model-name-input').focus();
@@ -191,7 +190,7 @@ function handleModelEdit(tier, index) {
 
 function handleModelSave(tier, index) {
   const listEl = elements[`modelList${tier.charAt(0) + tier.slice(1).toLowerCase()}`];
-  const row = listEl.querySelector(`.model-row[data-index="${index}"]`);
+  const row = listEl.querySelector(`.list-row[data-index="${index}"]`);
   const nameInput = row.querySelector('.model-name-input');
   const providerInput = row.querySelector('.model-provider-input');
 
@@ -232,7 +231,7 @@ function handleModelAdd(tier) {
   const index = currentModels[tier].length - 1;
 
   listEl.insertAdjacentHTML('beforeend', renderEditingModelItem('', [''], tier, index));
-  listEl.querySelector('.model-row:last-child .model-name-input').focus();
+  listEl.querySelector('.list-row:last-child .model-name-input').focus();
 }
 
 async function handleResetModels() {
@@ -243,193 +242,54 @@ async function handleResetModels() {
 }
 
 // ============================================
-// Drag and Drop with Live Reordering
+// Drag and Drop with SortableJS
 // ============================================
 
-let dragState = null;
+const sortableInstances = [];
 
-function getAllRows() {
-  return Array.from(elements.modelsBody.querySelectorAll('.model-row'));
-}
-
-function getRowsInTier(tier) {
-  const listEl = elements[`modelList${tier.charAt(0) + tier.slice(1).toLowerCase()}`];
-  return Array.from(listEl.querySelectorAll('.model-row'));
-}
-
-function clearDragClasses() {
-  getAllRows().forEach(row => {
-    row.classList.remove('dragging', 'drag-above', 'drag-below');
-  });
-  document.querySelectorAll('.model-list').forEach(list => {
-    list.classList.remove('drag-over-empty');
-  });
-}
-
-function handleDragStart(e) {
-  const handle = e.target.closest('.drag-handle');
-  if (!handle) {
-    e.preventDefault();
-    return;
-  }
-
-  const row = handle.closest('.model-row');
-  if (!row || row.querySelector('.model-item.editing')) {
-    e.preventDefault();
-    return;
-  }
-
-  dragState = {
-    row,
-    tier: row.dataset.tier,
-    index: parseInt(row.dataset.index, 10),
-    currentTier: row.dataset.tier,
-    currentIndex: parseInt(row.dataset.index, 10)
-  };
-
-  row.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', '');
-
-  // Create ghost image
-  const ghost = row.cloneNode(true);
-  ghost.style.position = 'absolute';
-  ghost.style.top = '-1000px';
-  document.body.appendChild(ghost);
-  e.dataTransfer.setDragImage(ghost, 20, 20);
-  setTimeout(() => ghost.remove(), 0);
-}
-
-function handleDragOver(e) {
-  if (!dragState) return;
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-
-  const targetRow = e.target.closest('.model-row');
-  const targetList = e.target.closest('.model-list');
-
-  if (!targetList) return;
-
-  const targetTier = targetList.id.replace('modelList', '').toUpperCase();
-  const rowsInTier = getRowsInTier(targetTier);
-  const isEmpty = rowsInTier.length === 0 || (rowsInTier.length === 1 && rowsInTier[0] === dragState.row);
-
-  // Clear all visual states first
-  clearDragClasses();
-  dragState.row.classList.add('dragging');
-
-  if (isEmpty || !targetRow) {
-    // Dropping into empty tier or at end
-    targetList.classList.add('drag-over-empty');
-    dragState.currentTier = targetTier;
-    dragState.currentIndex = currentModels[targetTier].length;
-    if (dragState.tier === targetTier) {
-      dragState.currentIndex = currentModels[targetTier].length - 1;
-    }
-    return;
-  }
-
-  if (targetRow === dragState.row) return;
-
-  const targetIndex = parseInt(targetRow.dataset.index, 10);
-  const targetRect = targetRow.getBoundingClientRect();
-  const midY = targetRect.top + targetRect.height / 2;
-  const insertBefore = e.clientY < midY;
-
-  // Calculate visual displacement for all items
-  const sameTier = dragState.tier === targetTier;
-  const dragIdx = dragState.index;
-
-  rowsInTier.forEach(row => {
-    if (row === dragState.row) return;
-
-    const idx = parseInt(row.dataset.index, 10);
-
-    if (sameTier) {
-      // Same tier reordering
-      if (insertBefore) {
-        if (dragIdx < targetIndex) {
-          // Dragging down, insert before target
-          if (idx > dragIdx && idx < targetIndex) row.classList.add('drag-above');
-          else if (idx === targetIndex) row.classList.add('drag-above');
-        } else {
-          // Dragging up
-          if (idx >= targetIndex && idx < dragIdx) row.classList.add('drag-below');
-        }
-      } else {
-        if (dragIdx < targetIndex) {
-          // Dragging down, insert after target
-          if (idx > dragIdx && idx <= targetIndex) row.classList.add('drag-above');
-        } else {
-          // Dragging up, insert after target
-          if (idx > targetIndex && idx < dragIdx) row.classList.add('drag-below');
-        }
-      }
-    } else {
-      // Cross-tier: shift items down from insert point
-      if (insertBefore && idx >= targetIndex) row.classList.add('drag-below');
-      else if (!insertBefore && idx > targetIndex) row.classList.add('drag-below');
-    }
-  });
-
-  // Also shift items in source tier if cross-tier
-  if (!sameTier) {
-    getRowsInTier(dragState.tier).forEach(row => {
-      if (row === dragState.row) return;
-      const idx = parseInt(row.dataset.index, 10);
-      if (idx > dragIdx) row.classList.add('drag-above');
-    });
-  }
-
-  dragState.currentTier = targetTier;
-  dragState.currentIndex = insertBefore ? targetIndex : targetIndex + 1;
-  if (sameTier && dragIdx < dragState.currentIndex) {
-    dragState.currentIndex--;
-  }
-}
-
-function handleDragEnd() {
-  if (!dragState) return;
-
-  // Commit the move if position changed
-  const moved = dragState.tier !== dragState.currentTier ||
-                dragState.index !== dragState.currentIndex;
-
-  if (moved) {
-    const [movedModel] = currentModels[dragState.tier].splice(dragState.index, 1);
-
-    // Adjust index if moving within same tier
-    let insertIdx = dragState.currentIndex;
-    if (dragState.tier === dragState.currentTier && dragState.index < insertIdx) {
-      // Already adjusted in dragover
-    }
-
-    currentModels[dragState.currentTier].splice(insertIdx, 0, movedModel);
-    saveModels();
-  }
-
-  clearDragClasses();
-  renderAllModels();
-  dragState = null;
-}
-
-function handleDragLeave(e) {
-  const list = e.target.closest('.model-list');
-  if (list && !list.contains(e.relatedTarget)) {
-    list.classList.remove('drag-over-empty');
-  }
+function getTierFromListId(id) {
+  return id.replace('modelList', '').toUpperCase();
 }
 
 function setupDragAndDrop() {
-  const modelsBody = elements.modelsBody;
+  // Destroy existing instances if any (for re-initialization)
+  sortableInstances.forEach(s => s.destroy());
+  sortableInstances.length = 0;
 
-  modelsBody.addEventListener('dragstart', handleDragStart);
-  modelsBody.addEventListener('dragover', handleDragOver);
-  modelsBody.addEventListener('dragleave', handleDragLeave);
-  modelsBody.addEventListener('dragend', handleDragEnd);
-  modelsBody.addEventListener('drop', (e) => {
-    e.preventDefault();
-    handleDragEnd();
+  ['High', 'Medium', 'Low'].forEach(tierName => {
+    const listEl = elements[`modelList${tierName}`];
+    const tier = tierName.toUpperCase();
+
+    const sortable = Sortable.create(listEl, {
+      group: 'models',
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'opacity-40',
+      chosenClass: 'bg-base-200',
+      dragClass: 'shadow-lg',
+      filter: '.model-name-input, .model-provider-input', // Prevent drag on inputs
+      preventOnFilter: false,
+
+      onEnd: (evt) => {
+        const fromTier = getTierFromListId(evt.from.id);
+        const toTier = getTierFromListId(evt.to.id);
+        const oldIndex = evt.oldIndex;
+        const newIndex = evt.newIndex;
+
+        // Skip if no actual move
+        if (fromTier === toTier && oldIndex === newIndex) return;
+
+        // Update data model
+        const [movedModel] = currentModels[fromTier].splice(oldIndex, 1);
+        currentModels[toTier].splice(newIndex, 0, movedModel);
+
+        // Save and re-render to sync data-index attributes
+        saveModels();
+        renderAllModels();
+      }
+    });
+
+    sortableInstances.push(sortable);
   });
 }
 
@@ -450,10 +310,12 @@ function setupModelsSection() {
 
   // Delegate clicks for model items
   elements.modelsBody.addEventListener('click', (e) => {
-    const btn = e.target.closest('.model-btn');
+    const btn = e.target.closest('button');
     if (!btn) return;
 
-    const row = btn.closest('.model-row');
+    const row = btn.closest('.list-row');
+    if (!row) return;
+
     const tier = row.dataset.tier;
     const index = parseInt(row.dataset.index, 10);
 
@@ -471,10 +333,10 @@ function setupModelsSection() {
   // Handle Enter key in inputs
   elements.modelsBody.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.classList.contains('model-name-input')) {
-      const row = e.target.closest('.model-row');
+      const row = e.target.closest('.list-row');
       handleModelSave(row.dataset.tier, parseInt(row.dataset.index, 10));
     } else if (e.key === 'Escape') {
-      const row = e.target.closest('.model-row');
+      const row = e.target.closest('.list-row');
       if (row) handleModelCancel(row.dataset.tier);
     }
   });
@@ -501,8 +363,8 @@ function setupOpenRouterApiKeyInput() {
 
 function setupSettingsToggle() {
   elements.settingsToggle.addEventListener('click', () => {
-    const isHidden = elements.settingsPanel.classList.contains('hidden');
-    toggleSettings(isHidden);
+    const isOpen = !elements.settingsPanel.classList.contains('hidden');
+    toggleSettings(!isOpen);
   });
 }
 

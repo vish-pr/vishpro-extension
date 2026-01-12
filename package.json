@@ -1,0 +1,23 @@
+{
+  "name": "vishpro-extension",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebuild": "rm -rf dist && mkdir -p dist && cp manifest.json icon.png icon.svg sidepanel.html dist/",
+    "build": "esbuild sidepanel.js background.js content.js --bundle --outdir=dist --format=esm --minify && npm run build:css",
+    "build:css": "tailwindcss -i ./input.css -o ./dist/styles.css --minify",
+    "prewatch": "npm run prebuild",
+    "watch": "npm run watch:js & npm run watch:css",
+    "watch:js": "esbuild sidepanel.js background.js content.js --bundle --outdir=dist --format=esm --watch",
+    "watch:css": "tailwindcss -i ./input.css -o ./dist/styles.css --watch"
+  },
+  "dependencies": {
+    "sortablejs": "^1.15.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.0.0",
+    "daisyui": "^5.0.0",
+    "esbuild": "^0.24.0",
+    "tailwindcss": "^4.0.0"
+  }
+}

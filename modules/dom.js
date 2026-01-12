@@ -13,7 +13,7 @@ export const elements = {
   currentTabExtractionContent: document.getElementById('currentTabExtractionContent'),
   historyTabContent: document.getElementById('historyTabContent'),
   actionsTabContent: document.getElementById('actionsTabContent'),
-  extractionTabs: document.querySelectorAll('.tab-btn'),
+  extractionTabs: document.querySelectorAll('[role="tablist"] .tab'),
 
   // OpenRouter settings
   openrouterApiKey: document.getElementById('openrouterApiKey'),

@@ -5,16 +5,18 @@ export function renderExtractionItem(extraction) {
   const { text = '', links = [], buttons = [] } = extraction;
 
   return `
-    <div class="data-card" data-url="${extraction.url}" data-timestamp="${extraction.timestamp}">
-      <div class="data-card-header">
-        <div class="data-card-title">${extraction.title || 'Untitled'}</div>
-        <div class="data-card-time">${formatTimestamp(extraction.timestamp)}</div>
-      </div>
-      <div class="data-card-url">${extraction.url}</div>
-      <div class="data-card-stats">
-        <span class="stat"><span class="stat-value">${text.length}</span> chars</span>
-        <span class="stat"><span class="stat-value">${links.length}</span> links</span>
-        <span class="stat"><span class="stat-value">${buttons.length}</span> buttons</span>
+    <div class="card bg-base-300 border border-base-content/10 cursor-pointer hover:border-base-content/30 transition-colors mb-2" data-url="${extraction.url}" data-timestamp="${extraction.timestamp}">
+      <div class="card-body p-3 gap-1">
+        <div class="flex justify-between items-start">
+          <h3 class="card-title text-sm truncate flex-1">${extraction.title || 'Untitled'}</h3>
+          <span class="text-[11px] opacity-50 ml-2 shrink-0">${formatTimestamp(extraction.timestamp)}</span>
+        </div>
+        <p class="text-[11px] opacity-50 truncate">${extraction.url}</p>
+        <div class="flex gap-3 text-[11px] opacity-70 mt-1">
+          <span><span class="text-primary font-medium">${text.length}</span> chars</span>
+          <span><span class="text-primary font-medium">${links.length}</span> links</span>
+          <span><span class="text-primary font-medium">${buttons.length}</span> buttons</span>
+        </div>
       </div>
     </div>
   `;
@@ -22,9 +24,9 @@ export function renderExtractionItem(extraction) {
 
 function renderSection(label, content) {
   return `
-    <div class="extraction-detail-section">
-      <div class="extraction-detail-label">${label}</div>
-      <div class="extraction-detail-content">${content}</div>
+    <div class="mt-3">
+      <div class="text-[11px] font-semibold uppercase tracking-wide opacity-50 mb-1.5">${label}</div>
+      <div class="text-xs leading-relaxed opacity-70 whitespace-pre-wrap break-words bg-base-300 p-2.5 rounded max-h-24 overflow-y-auto">${content}</div>
     </div>
   `;
 }
@@ -47,28 +49,28 @@ export function renderExtractionDetail(extraction) {
   ].filter(Boolean).join('');
 
   return `
-    <div class="extraction-detail">
-      <div class="extraction-detail-header">
-        <div class="extraction-detail-title">${extraction.title || 'Untitled'}</div>
-        <div class="extraction-detail-url">${extraction.url}</div>
-        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 6px;">
-          Extracted: ${formatTimestamp(extraction.timestamp)}
+    <div class="card bg-base-300 border border-base-content/10 max-h-64 overflow-y-auto">
+      <div class="card-body p-3.5">
+        <div class="border-b border-base-content/10 pb-2.5 mb-1">
+          <h3 class="font-medium text-sm">${extraction.title || 'Untitled'}</h3>
+          <p class="text-[11px] opacity-50 break-all mt-1">${extraction.url}</p>
+          <p class="text-[11px] opacity-40 mt-1.5">Extracted: ${formatTimestamp(extraction.timestamp)}</p>
         </div>
+        ${sections}
       </div>
-      ${sections}
     </div>
   `;
 }
 
 export function renderActionHistoryItem(action) {
   return `
-    <div class="action-log-item">
-      <div class="action-log-time">${formatTimestamp(action.timestamp)}</div>
-      <div class="action-log-text">${action.description}</div>
+    <div class="bg-base-300 border border-base-content/10 rounded-lg p-2.5 mb-1.5">
+      <div class="text-[11px] opacity-50">${formatTimestamp(action.timestamp)}</div>
+      <div class="text-xs opacity-70 leading-relaxed mt-0.5">${action.description}</div>
     </div>
   `;
 }
 
 export function renderNoData(message) {
-  return `<div class="no-data">${message}</div>`;
+  return `<div class="text-center opacity-50 text-sm py-6">${message}</div>`;
 }

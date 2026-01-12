@@ -11,14 +11,14 @@ const TABS = {
 
 export function switchToTab(tabName) {
   elements.extractionTabs.forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.tab === tabName);
+    tab.classList.toggle('tab-active', tab.dataset.tab === tabName);
   });
 }
 
 function showTabContent(tabName) {
-  elements.currentTabContent.classList.toggle('active', tabName === TABS.CURRENT);
-  elements.historyTabContent.classList.toggle('active', tabName === TABS.HISTORY);
-  elements.actionsTabContent.classList.toggle('active', tabName === TABS.ACTIONS);
+  elements.currentTabContent.classList.toggle('hidden', tabName !== TABS.CURRENT);
+  elements.historyTabContent.classList.toggle('hidden', tabName !== TABS.HISTORY);
+  elements.actionsTabContent.classList.toggle('hidden', tabName !== TABS.ACTIONS);
 }
 
 async function loadCurrentPage() {
@@ -85,7 +85,7 @@ async function showExtractionDetail(url, timestamp) {
 }
 
 function attachHistoryItemListeners() {
-  elements.historyTabContent.querySelectorAll('.data-card').forEach(item => {
+  elements.historyTabContent.querySelectorAll('.card').forEach(item => {
     item.addEventListener('click', () => {
       showExtractionDetail(item.dataset.url, item.dataset.timestamp);
     });
@@ -94,12 +94,16 @@ function attachHistoryItemListeners() {
 
 function setupHistoryToggle() {
   elements.historyToggle.addEventListener('click', async () => {
-    const isHidden = elements.extractionPanel.classList.contains('hidden');
-    elements.extractionPanel.classList.toggle('hidden');
-    elements.historyToggle.classList.toggle('active');
+    const isOpen = !elements.extractionPanel.classList.contains('hidden');
+    elements.extractionPanel.classList.toggle('hidden', isOpen);
+    elements.historyToggle.classList.toggle('btn-active', !isOpen);
 
-    if (isHidden) {
-      const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+    // Close settings panel when opening extraction panel
+    if (!isOpen) {
+      elements.settingsPanel.classList.add('hidden');
+      elements.settingsToggle.classList.remove('btn-active');
+
+      const activeTab = document.querySelector('[role="tablist"] .tab.tab-active')?.dataset.tab || 'current';
       await loadTabContent(activeTab);
     }
   });

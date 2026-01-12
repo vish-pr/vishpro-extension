@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: night;
+}
+
+/* Scan extension folder for classes */
+@source "./**/*.{html,js}";
+
+/* Custom properties */
+@theme {
+  --font-sans: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Base styles */
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Brand icon gradient */
+.brand-icon {
+  background: linear-gradient(135deg, oklch(0.7 0.15 250), oklch(0.7 0.2 300));
+}
+
+/* Status dot */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(0.5 0 0);
+  transition: background 0.2s;
+}
+.status-dot.active {
+  background: oklch(0.7 0.2 145);
+}
+
+/* Chat message animation */
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.message {
+  animation: msgIn 0.2s ease;
+}
+
+/* Drag handle */
+.drag-handle {
+  cursor: grab;
+  transition: opacity 0.15s, color 0.15s;
+}
+.drag-handle:hover {
+  color: oklch(0.7 0.15 250);
+}
+.drag-handle:active { cursor: grabbing; }
+
+/* SortableJS states */
+.sortable-ghost { opacity: 0.4; }
+.sortable-chosen { background: oklch(0.2 0.03 265); }
+.sortable-drag { box-shadow: 0 4px 12px oklch(0 0 0 / 0.3); }
+
+/* Markdown in chat */
+.chat-bubble strong { font-weight: 600; }
+.chat-bubble em { font-style: italic; }
+.chat-bubble code {
+  background: rgba(0,0,0,0.2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+.chat-bubble-primary code {
+  background: rgba(255,255,255,0.2);
+}

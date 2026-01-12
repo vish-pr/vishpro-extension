@@ -25,13 +25,21 @@ export function addMessage(role, content) {
   clearEmptyState();
 
   const messageDiv = document.createElement('div');
-  messageDiv.className = `message ${role}`;
 
-  const bubbleDiv = document.createElement('div');
-  bubbleDiv.className = 'message-bubble';
-  bubbleDiv.innerHTML = renderMarkdown(content);
+  if (role === 'system') {
+    messageDiv.className = 'message text-center';
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'badge badge-ghost text-xs py-3 px-4';
+    bubbleDiv.innerHTML = renderMarkdown(content);
+    messageDiv.appendChild(bubbleDiv);
+  } else {
+    messageDiv.className = `chat ${role === 'user' ? 'chat-end' : 'chat-start'} message`;
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = `chat-bubble ${role === 'user' ? 'chat-bubble-primary' : ''} text-sm`;
+    bubbleDiv.innerHTML = renderMarkdown(content);
+    messageDiv.appendChild(bubbleDiv);
+  }
 
-  messageDiv.appendChild(bubbleDiv);
   elements.chatContainer.appendChild(messageDiv);
   elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
 }
@@ -40,18 +48,12 @@ function addTypingIndicator() {
   clearEmptyState();
 
   const messageDiv = document.createElement('div');
-  messageDiv.className = 'message assistant';
+  messageDiv.className = 'chat chat-start message';
   messageDiv.id = 'typing-indicator';
 
   const bubbleDiv = document.createElement('div');
-  bubbleDiv.className = 'message-bubble';
-  bubbleDiv.innerHTML = `
-    <div class="typing-indicator">
-      <span></span>
-      <span></span>
-      <span></span>
-    </div>
-  `;
+  bubbleDiv.className = 'chat-bubble';
+  bubbleDiv.innerHTML = '<span class="loading loading-dots loading-sm"></span>';
 
   messageDiv.appendChild(bubbleDiv);
   elements.chatContainer.appendChild(messageDiv);
