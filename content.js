@@ -1,27 +1,18 @@
 // Content Script - runs on all web pages
-
-// Content action constants (inlined to support dynamic injection)
 const ContentAction = {
   EXTRACT_CONTENT: 'extractContent',
   CLICK_ELEMENT: 'clickElement',
-  HIGHLIGHT_ELEMENT: 'highlightElement',
   FILL_FORM: 'fillForm',
-  SCROLL_AND_WAIT: 'scrollAndWait',
-  FIND_ELEMENTS: 'findElements',
-  MULTI_ACTION: 'multiAction'
+  SCROLL_AND_WAIT: 'scrollAndWait'
 };
 
 const isMac = navigator.platform.toLowerCase().includes('mac');
 
-// Action handlers map
 const handlers = {
   [ContentAction.EXTRACT_CONTENT]: () => extractPageContent(),
   [ContentAction.CLICK_ELEMENT]: (msg) => clickElement(msg.elementId, msg.modifiers),
-  [ContentAction.HIGHLIGHT_ELEMENT]: (msg) => (highlightElement(msg.elementId), { result: 'highlighted' }),
   [ContentAction.FILL_FORM]: (msg) => fillFormFields(msg.fields, msg.submit, msg.submitElementId),
-  [ContentAction.SCROLL_AND_WAIT]: (msg) => scrollAndWait(msg.direction, msg.pixels, msg.waitMs),
-  [ContentAction.FIND_ELEMENTS]: (msg) => findElementsWithHints(msg.selectors),
-  [ContentAction.MULTI_ACTION]: (msg) => executeMultipleActions(msg.actions)
+  [ContentAction.SCROLL_AND_WAIT]: (msg) => scrollAndWait(msg.direction, msg.pixels, msg.waitMs)
 };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -300,16 +291,6 @@ function hasModifiers(modifiers) {
   return modifiers.ctrlKey || modifiers.metaKey || modifiers.shiftKey || modifiers.altKey;
 }
 
-function highlightElement(elementId) {
-  const element = document.querySelector(`[data-vish-id="${elementId}"]`);
-  if (element) {
-    element.style.outline = '3px solid red';
-    setTimeout(() => {
-      element.style.outline = '';
-    }, 2000);
-  }
-}
-
 // Form filling with validation
 function fillFormFields(fields, shouldSubmit, submitElementId) {
   // Fill all fields
@@ -366,80 +347,3 @@ async function scrollAndWait(direction, pixels, waitMs = 500) {
   };
 }
 
-// NEW: Find multiple elements with metadata
-function findElementsWithHints(selectors) {
-  const results = {};
-
-  for (const key in selectors) {
-    const selector = selectors[key];
-    const elements = Array.from(document.querySelectorAll(selector));
-
-    results[key] = elements.map((el, index) => ({
-      index,
-      tag: el.tagName.toLowerCase(),
-      text: el.innerText?.substring(0, 100),
-      id: el.id,
-      className: el.className,
-      visible: isElementVisible(el),
-      selector: generateSelector(el)
-    }));
-  }
-
-  return results;
-}
-
-// Helper: Check if element is visible
-function isElementVisible(el) {
-  return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
-}
-
-// Helper: Generate CSS selector for element
-function generateSelector(el) {
-  if (el.id) return `#${el.id}`;
-  if (el.className) {
-    const classes = el.className.split(' ').filter(c => c).join('.');
-    if (classes) return `${el.tagName.toLowerCase()}.${classes}`;
-  }
-  return el.tagName.toLowerCase();
-}
-
-// Action handlers for multi-action execution
-const ACTION_HANDLERS = {
-  click: (elementId) => {
-    const el = document.querySelector(`[data-vish-id="${elementId}"]`);
-    if (el) {
-      el.click();
-      return { type: 'click', success: true, elementId };
-    }
-    return { type: 'click', success: false, elementId };
-  },
-  fill: (elementId, value) => {
-    const el = document.querySelector(`[data-vish-id="${elementId}"]`);
-    if (el) {
-      el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      return { type: 'fill', success: true, elementId };
-    }
-    return { type: 'fill', success: false, elementId };
-  }
-};
-
-// Execute multiple actions sequentially
-async function executeMultipleActions(actions) {
-  const results = [];
-
-  for (const action of actions) {
-    const handler = ACTION_HANDLERS[action.type];
-    if (handler) {
-      results.push(handler(action.elementId, action.value));
-    }
-
-    if (action.wait) {
-      await new Promise(resolve => setTimeout(resolve, action.wait));
-    }
-  }
-
-  return { executed: results.length, results };
-}
-
-// Content script is now loaded

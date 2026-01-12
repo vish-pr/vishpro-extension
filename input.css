@@ -77,3 +77,71 @@ body {
 .chat-bubble-primary code {
   background: rgba(255,255,255,0.2);
 }
+
+/* Whisper-quiet status notifications */
+.status-whisper-container {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+
+.status-whisper {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 2px 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.01em;
+  color: oklch(0.5 0 0);
+  opacity: 0;
+  animation: whisperIn 0.3s ease forwards;
+}
+
+.status-whisper.success { color: oklch(0.5 0.08 145); }
+.status-whisper.error { color: oklch(0.55 0.1 25); }
+.status-whisper.info { color: oklch(0.5 0.04 250); }
+
+.status-whisper.dismissing {
+  animation: whisperOut 0.3s ease forwards;
+}
+
+.status-dot-indicator {
+  flex-shrink: 0;
+  width: 4px;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-whisper.success .status-dot-indicator,
+.status-whisper.error .status-dot-indicator {
+  animation: none;
+}
+
+.status-text {
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+@keyframes whisperIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes whisperOut {
+  from { opacity: 1; transform: translateY(0); max-height: 40px; }
+  to { opacity: 0; transform: translateY(-4px); max-height: 0; padding: 0; margin: 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}

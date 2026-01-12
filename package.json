@@ -7,7 +7,7 @@
     "build": "esbuild sidepanel.js background.js content.js --bundle --outdir=dist --format=esm --minify && npm run build:css",
     "build:css": "tailwindcss -i ./input.css -o ./dist/styles.css --minify",
     "prewatch": "npm run prebuild",
-    "watch": "npm run watch:js & npm run watch:css",
+    "watch": "concurrently \"npm run watch:js\" \"npm run watch:css\"",
     "watch:js": "esbuild sidepanel.js background.js content.js --bundle --outdir=dist --format=esm --watch",
     "watch:css": "tailwindcss -i ./input.css -o ./dist/styles.css --watch"
   },
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.0.0",
+    "concurrently": "^9.2.1",
     "daisyui": "^5.0.0",
     "esbuild": "^0.24.0",
     "tailwindcss": "^4.0.0"

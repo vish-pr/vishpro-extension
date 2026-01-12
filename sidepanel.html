@@ -11,18 +11,18 @@
 <body class="bg-base-300 text-base-content">
 
   <!-- Header -->
-  <header class="navbar bg-base-200 border-b border-base-content/10 px-4 min-h-14">
-    <div class="flex-1 gap-3">
-      <div class="brand-icon w-8 h-8 rounded-lg flex items-center justify-center text-white font-semibold text-sm">V</div>
-      <div>
-        <h1 id="headerTitle" class="text-[15px] font-semibold leading-tight">VishPro</h1>
+  <header class="navbar bg-base-200 border-b border-base-content/10 px-4 min-h-14 gap-2">
+    <div class="navbar-start gap-3">
+      <div class="brand-icon w-8 h-8 rounded-lg flex items-center justify-center text-white font-semibold text-sm shrink-0">V</div>
+      <div class="min-w-0">
+        <h1 id="headerTitle" class="text-[15px] font-semibold leading-tight truncate">VishPro</h1>
         <div class="flex items-center gap-1.5 text-xs opacity-50">
-          <span class="status-dot" id="statusDot"></span>
-          <span id="statusText">Ready</span>
+          <span class="status-dot shrink-0" id="statusDot"></span>
+          <span id="statusText" class="truncate">Ready</span>
         </div>
       </div>
     </div>
-    <div class="flex gap-1">
+    <div class="navbar-end gap-1">
       <button id="historyToggle" class="btn btn-ghost btn-sm btn-square" title="Data & History">
         <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
