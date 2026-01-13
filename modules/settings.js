@@ -3,6 +3,7 @@ import { elements } from './dom.js';
 import * as storage from './storage.js';
 import { addMessage } from './chat.js';
 import { setApiKey, getModels, setModels, getDefaultModels, fetchAvailableModels, fetchAvailableProviders, verifyModel } from './llm.js';
+import { getModelStatsCounter } from './time-bucket-counter.js';
 import Sortable from 'sortablejs';
 
 let availableModels = [], availableProviders = [], currentModels = null;
@@ -13,27 +14,33 @@ const STATUS = {
   INVALID: { inputClass: 'input-error', textClass: 'text-error', icon: '✗' },
   VERIFYING: { inputClass: 'input-warning', textClass: 'text-warning', icon: '⏳' }
 };
-const ICONS = {
-  drag: `<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/><circle cx="2" cy="7" r="1.5"/><circle cx="8" cy="7" r="1.5"/><circle cx="2" cy="12" r="1.5"/><circle cx="8" cy="12" r="1.5"/></svg>`,
-  edit: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
-  delete: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`,
-  check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>`
-};
+
+// Template helper
+const tpl = id => document.getElementById(id).content.cloneNode(true).firstElementChild;
 
 async function verifyAllModels() {
   const tasks = [];
+  const counter = getModelStatsCounter();
+  let needsSave = false;
   for (const tier of TIERS) {
     for (let i = 0; i < (currentModels[tier]?.length || 0); i++) {
       const [model, providers] = currentModels[tier][i];
       const key = `${tier}:${i}`;
       if (!model || verificationStatus.has(key)) continue;
-      tasks.push(verifyModel(model, providers || []).then(result => {
+      tasks.push(verifyModel(model, providers || []).then(async result => {
         verificationStatus.set(key, { verified: result.valid, error: result.error });
+        // Update model config if noToolChoice discovered
+        if (result.noToolChoice) {
+          currentModels[tier][i] = [model, providers, { noToolChoice: true }];
+          needsSave = true;
+        }
+        await counter.increment(model, result.valid ? 'success' : 'error');
         renderTierModels(tier);
       }));
     }
   }
   await Promise.all(tasks);
+  if (needsSave) saveModels();
 }
 
 function updateApiKeyStatus(status) {
@@ -88,65 +95,78 @@ async function verifyApiKey(apiKey) {
 }
 
 // Model Configuration
-function renderModelItem(model, provider, tier, index) {
+function createModelItem(model, provider, opts, tier, index, stats) {
+  const el = tpl('tpl-model-item');
+  el.dataset.tier = tier;
+  el.dataset.index = index;
+  el.querySelector('.model-name').textContent = model;
+
+  // Provider badges
+  const badgesEl = el.querySelector('.provider-badges');
   const providers = Array.isArray(provider) ? provider.filter(Boolean) : [];
-  const providerDisplay = providers.length
-    ? providers.map(p => `<span class="badge badge-ghost badge-xs">${p}</span>`).join(' ')
-    : '<span class="text-[10px] opacity-40">auto routing</span>';
+  if (providers.length) {
+    providers.forEach(p => {
+      const badge = document.createElement('span');
+      badge.className = 'badge badge-ghost badge-xs';
+      badge.textContent = p;
+      badgesEl.appendChild(badge);
+    });
+  } else {
+    badgesEl.innerHTML = '<span class="text-[10px] opacity-40">auto routing</span>';
+  }
+
+  // Status indicator (solid lights, no animation)
+  const statusEl = el.querySelector('.status-indicator');
   const status = verificationStatus.get(`${tier}:${index}`);
-  const statusIndicator = status?.verified === true
-    ? `<div class="tooltip tooltip-right" data-tip="Verified"><div class="status status-success animate-pulse"></div></div>`
-    : status?.verified === false
-      ? `<div class="tooltip tooltip-right tooltip-error" data-tip="${(status.error || 'Unknown error').replace(/"/g, '&quot;')}"><div class="status status-error"></div></div>`
-      : '';
-  return `<li class="list-row items-center transition-all duration-200" data-tier="${tier}" data-index="${index}">
-    <div class="drag-handle cursor-grab opacity-40 hover:opacity-100 transition-opacity">${ICONS.drag}</div>
-    ${statusIndicator}
-    <div class="list-col-grow min-w-0">
-      <div class="text-xs font-mono truncate">${model}</div>
-      <div class="flex gap-1 mt-0.5">${providerDisplay}</div>
-    </div>
-    <button class="btn btn-ghost btn-xs btn-square edit" title="Edit">${ICONS.edit}</button>
-    <button class="btn btn-ghost btn-xs btn-square delete hover:btn-error" title="Remove">${ICONS.delete}</button>
-  </li>`;
+  if (status?.verified === true) {
+    statusEl.innerHTML = `<div class="tooltip tooltip-right" data-tip="Verified"><div class="status status-success"></div></div>`;
+  } else if (status?.verified === false) {
+    statusEl.innerHTML = `<div class="tooltip tooltip-right tooltip-error" data-tip="${(status.error || 'Unknown error').replace(/"/g, '&quot;')}"><div class="status status-error"></div></div>`;
+  }
+
+  // Warning indicator for noToolChoice
+  if (opts?.noToolChoice) {
+    const warningEl = el.querySelector('.warning-indicator');
+    warningEl.classList.remove('hidden');
+    warningEl.innerHTML = `<div class="tooltip tooltip-bottom tooltip-warning" data-tip="No tool_choice support"><svg class="w-3 h-3 text-warning" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 4l7.5 13h-15L12 6zm-1 5v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg></div>`;
+  }
+
+  // Inline stats
+  if (stats) {
+    const statsEl = el.querySelector('.model-stats');
+    const success = stats.success?.total || 0;
+    const error = stats.error?.total || 0;
+    const total = success + error;
+    if (total > 0) {
+      const rate = Math.round((success / total) * 100);
+      const rateClass = rate >= 90 ? 'text-success' : rate >= 70 ? 'text-warning' : 'text-error';
+      statsEl.innerHTML = `<span class="${rateClass} font-medium">${rate}%</span><span class="opacity-40">·</span><span>${total} calls</span>`;
+    }
+  }
+
+  return el;
 }
 
-function renderEditingModelItem(model, provider, tier, index) {
-  const providerStr = Array.isArray(provider) ? provider.filter(Boolean).join(', ') : '';
-  const dropdownCls = 'dropdown-content flex flex-col bg-base-200 rounded-box z-50 w-full max-h-48 overflow-y-auto shadow-lg border border-base-content/10 p-1 hidden';
-  return `<li class="list-row items-center bg-base-200" data-tier="${tier}" data-index="${index}">
-    <div class="w-[10px]"></div>
-    <div class="list-col-grow min-w-0 space-y-1">
-      <div class="dropdown dropdown-bottom dropdown-open w-full">
-        <input type="text" class="model-name-input input input-xs input-bordered w-full font-mono" value="${model}" placeholder="model/name" autocomplete="off">
-        <ul class="model-autocomplete ${dropdownCls}"></ul>
-      </div>
-      <div class="flex items-center gap-1">
-        <span class="text-[10px] opacity-50">via</span>
-        <div class="dropdown dropdown-bottom dropdown-end dropdown-open flex-1">
-          <input type="text" class="model-provider-input input input-xs input-bordered w-full" value="${providerStr}" placeholder="provider (optional)" autocomplete="off">
-          <ul class="provider-autocomplete ${dropdownCls}"></ul>
-        </div>
-      </div>
-    </div>
-    <button class="btn btn-ghost btn-xs btn-square save hover:btn-success" title="Save">${ICONS.check}</button>
-    <button class="btn btn-ghost btn-xs btn-square cancel" title="Cancel">${ICONS.delete}</button>
-  </li>`;
+function createEditingModelItem(model, provider, tier, index) {
+  const el = tpl('tpl-model-editing');
+  el.dataset.tier = tier;
+  el.dataset.index = index;
+  el.querySelector('.model-name-input').value = model;
+  el.querySelector('.model-provider-input').value = Array.isArray(provider) ? provider.filter(Boolean).join(', ') : '';
+  return el;
 }
 
-function updateAutocomplete(input, el, items, key, dataAttr) {
+function updateAutocomplete(input, listEl, items, key, dataAttr) {
   const q = input.value.toLowerCase().trim();
   const matches = q
     ? items.filter(m => m[key].toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
     : [...items].sort((a, b) => a[key].localeCompare(b[key]));
-  if (!matches.length) { el.classList.add('hidden'); return; }
-  el.innerHTML = matches.map(m => `<li class="px-2 py-1.5 rounded cursor-pointer hover:bg-base-300 transition-colors text-xs" data-${dataAttr}="${m[key]}">
-    <div class="font-mono truncate">${m[key]}</div><div class="opacity-50 text-[10px] truncate">${m.name}</div>
-  </li>`).join('');
-  el.classList.remove('hidden');
+  if (!matches.length) { listEl.classList.add('hidden'); return; }
+  listEl.innerHTML = matches.map(m => `<li class="px-2 py-1.5 rounded cursor-pointer hover:bg-base-300 transition-colors text-xs" data-${dataAttr.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}="${m[key]}"><div class="font-mono truncate">${m[key]}</div><div class="opacity-50 text-[10px] truncate">${m.name}</div></li>`).join('');
+  listEl.classList.remove('hidden');
 }
 
-function updateModelAutocomplete(input, el) { updateAutocomplete(input, el, availableModels, 'id', 'model-id'); }
+function updateModelAutocomplete(input, el) { updateAutocomplete(input, el, availableModels, 'id', 'modelId'); }
 
 function updateProviderAutocomplete(input, el, modelInput) {
   const modelId = modelInput?.value.trim();
@@ -156,14 +176,29 @@ function updateProviderAutocomplete(input, el, modelInput) {
 
 const getListEl = tier => elements[`modelList${tier.charAt(0) + tier.slice(1).toLowerCase()}`];
 
-function renderTierModels(tier) {
-  const models = currentModels[tier] || [];
-  getListEl(tier).innerHTML = models.length
-    ? models.map(([m, p], i) => renderModelItem(m, p, tier, i)).join('')
-    : '<li class="text-center text-xs opacity-50 py-4">No models configured</li>';
+let cachedStats = null;
+
+async function refreshStats() {
+  const counter = getModelStatsCounter();
+  cachedStats = await counter.getAllStats();
 }
 
-function renderAllModels() { TIERS.forEach(renderTierModels); }
+async function renderTierModels(tier) {
+  const listEl = getListEl(tier);
+  listEl.innerHTML = '';
+  const models = currentModels[tier] || [];
+  if (!models.length) {
+    listEl.innerHTML = '<li class="text-center text-xs opacity-50 py-4">No models configured</li>';
+    return;
+  }
+  if (!cachedStats) await refreshStats();
+  models.forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, cachedStats[m])));
+}
+
+async function renderAllModels() {
+  await refreshStats();
+  TIERS.forEach(renderTierModels);
+}
 
 const saveModels = () => setModels(currentModels);
 
@@ -186,7 +221,7 @@ function shiftVerificationStatus(tier, fromIdx, direction) {
 function handleModelEdit(tier, index) {
   const [model, provider] = currentModels[tier][index];
   const row = getListEl(tier).querySelector(`.list-row[data-index="${index}"]`);
-  row.outerHTML = renderEditingModelItem(model, provider, tier, index);
+  row.replaceWith(createEditingModelItem(model, provider, tier, index));
   getListEl(tier).querySelector('.model-name-input').focus();
 }
 
@@ -196,17 +231,24 @@ async function handleModelSave(tier, index) {
   const model = row.querySelector('.model-name-input').value.trim();
   const providers = row.querySelector('.model-provider-input').value.split(',').map(p => p.trim()).filter(Boolean);
   if (!model) { addMessage('system', '✗ Model name is required'); return; }
+  const originalHtml = saveBtn.innerHTML;
   saveBtn.disabled = true;
   saveBtn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
   addMessage('system', `Verifying ${model}...`);
   const result = await verifyModel(model, providers);
+  const counter = getModelStatsCounter();
+  await counter.increment(model, result.valid ? 'success' : 'error');
   saveBtn.disabled = false;
-  saveBtn.innerHTML = ICONS.check;
+  saveBtn.innerHTML = originalHtml;
   verificationStatus.set(`${tier}:${index}`, { verified: result.valid, error: result.error });
-  currentModels[tier][index] = [model, providers];
+  const opts = result.noToolChoice ? { noToolChoice: true } : undefined;
+  currentModels[tier][index] = [model, providers, opts];
   saveModels();
   renderTierModels(tier);
-  addMessage('system', result.valid ? '✓ Model verified and saved' : `✗ Model verification failed: ${result.error}`);
+  const msg = result.valid
+    ? (result.noToolChoice ? '✓ Model verified (no tool_choice support)' : '✓ Model verified and saved')
+    : `✗ Model verification failed: ${result.error}`;
+  addMessage('system', msg);
 }
 
 function handleModelDelete(tier, index) {
@@ -217,12 +259,15 @@ function handleModelDelete(tier, index) {
   addMessage('system', '✓ Model removed');
 }
 
-function handleModelAdd(tier) {
+async function handleModelAdd(tier) {
   const listEl = getListEl(tier);
-  listEl.querySelector('.empty-tier')?.remove();
+  listEl.innerHTML = '';
   currentModels[tier].push(['', ['']]);
   const index = currentModels[tier].length - 1;
-  listEl.insertAdjacentHTML('beforeend', renderEditingModelItem('', [''], tier, index));
+  // Re-render existing models then add editing row
+  if (!cachedStats) await refreshStats();
+  currentModels[tier].slice(0, -1).forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, cachedStats[m])));
+  listEl.appendChild(createEditingModelItem('', [''], tier, index));
   listEl.querySelector('.list-row:last-child .model-name-input').focus();
 }
 
@@ -230,7 +275,7 @@ async function handleResetModels() {
   currentModels = getDefaultModels();
   verificationStatus.clear();
   await saveModels();
-  renderAllModels();
+  await renderAllModels();
   addMessage('system', '✓ Models reset to defaults');
   verifyAllModels();
 }
@@ -345,7 +390,7 @@ export async function initSettings() {
     await setApiKey(openrouterApiKey);
   }
   currentModels = await getModels();
-  renderAllModels();
+  await renderAllModels();
   if (!openrouterApiKeyValid) toggleSettings(true);
   updateHeaderTitle();
 

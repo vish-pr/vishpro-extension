@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { getModelStatsCounter } from './time-bucket-counter.js';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const SITE_NAME = 'VishPro Browser Agent';
@@ -19,7 +20,7 @@ async function loadModels() {
 
 async function getCascadingModels(intelligence) {
   const m = await loadModels(), levels = ['HIGH', 'MEDIUM', 'LOW'];
-  return levels.slice(Math.max(0, levels.indexOf(intelligence))).flatMap(l => (m[l] || []).map(([model, only]) => ({ model, only })));
+  return levels.slice(Math.max(0, levels.indexOf(intelligence))).flatMap(l => (m[l] || []).map(([model, only, opts]) => ({ model, only, noToolChoice: opts?.noToolChoice })));
 }
 
 function shouldSkip(model) {
@@ -35,8 +36,9 @@ function recordFailure(model) {
   else if (t.skips >= t.failures) { t.failures++; t.skips = 0; }
 }
 
-async function callAPI(model, messages, tools, only) {
-  const request = { model, messages, tools, tool_choice: 'required' };
+async function callAPI(model, messages, tools, only, noToolChoice) {
+  const request = { model, messages, tools };
+  if (!noToolChoice) request.tool_choice = 'required';
   if (only?.length) request.provider = { only };
   logger.debug(`LLM Request Details`, { request });
   const response = await fetch(ENDPOINT, {
@@ -60,19 +62,21 @@ export async function generate({ messages, intelligence = 'MEDIUM', tools }) {
   if (!await isInitialized()) throw new Error('OpenRouter API key not configured');
   const cascadingModels = await getCascadingModels(intelligence);
   let lastError = null;
-  for (const { model, only } of cascadingModels) {
+  for (const { model, only, noToolChoice } of cascadingModels) {
     if (shouldSkip(model)) continue;
     try {
       logger.info(`LLM Request: ${model}`, { messageCount: messages.length, intelligence, toolCount: tools.length });
-      const result = await callAPI(model, messages, tools, only);
+      const result = await callAPI(model, messages, tools, only, noToolChoice);
       if (result.tool_calls?.length && !result.tool_calls[0].function?.name) throw new Error('Invalid tool call: missing function name');
       logger.info(`LLM Response: ${model}`);
       logger.debug(`LLM Response Details`, { model, response: result });
       modelFailures.delete(model);
+      getModelStatsCounter().increment(model, 'success').catch(e => logger.warn('Stats increment failed', { error: e.message }));
       return result;
     } catch (error) {
       lastError = error;
       recordFailure(model);
+      getModelStatsCounter().increment(model, 'error').catch(e => logger.warn('Stats increment failed', { error: e.message }));
       logger.warn(`LLM Failure: ${model}`, { model, error: error.message });
     }
   }
@@ -122,17 +126,48 @@ export async function fetchAvailableProviders() {
   } catch { return cachedProviders || []; }
 }
 
+export async function getModelStats() {
+  return getModelStatsCounter().getAllStats();
+}
+
+export async function resetModelStats(model = null) {
+  return getModelStatsCounter().reset(model);
+}
+
+const VERIFY_TOOL = [{
+  type: 'function',
+  function: { name: 'test', description: 'Test function', parameters: { type: 'object', properties: {} } }
+}];
+
 export async function verifyModel(modelId, providers = []) {
   if (!await isInitialized()) return { valid: false, error: 'API key not configured' };
-  const request = { model: modelId, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1 };
-  if (providers.length) request.provider = { only: providers };
+  const baseRequest = { model: modelId, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1, tools: VERIFY_TOOL };
+  if (providers.length) baseRequest.provider = { only: providers };
+
+  // First try with tool_choice
   try {
     const response = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': SITE_NAME },
-      body: JSON.stringify(request)
+      body: JSON.stringify({ ...baseRequest, tool_choice: 'required' })
     });
-    if (!response.ok) return { valid: false, error: (await response.json().catch(() => ({}))).error?.message || 'Model verification failed' };
-    return { valid: true };
+    if (response.ok) return { valid: true };
+    const err = await response.json().catch(() => ({}));
+    const errorMsg = err.error?.message || 'Model verification failed';
+
+    // Check if it's a tool_choice error - retry without tool_choice
+    // Match various provider error patterns (case-insensitive)
+    const lowerMsg = errorMsg.toLowerCase();
+    if (lowerMsg.includes('tool_choice') || lowerMsg.includes('tool choice') ||
+        (lowerMsg.includes('tool') && lowerMsg.includes('not supported'))) {
+      const retryResponse = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': SITE_NAME },
+        body: JSON.stringify(baseRequest)
+      });
+      if (retryResponse.ok) return { valid: true, noToolChoice: true };
+      return { valid: false, error: (await retryResponse.json().catch(() => ({}))).error?.message || 'Model verification failed' };
+    }
+    return { valid: false, error: errorMsg };
   } catch (e) { return { valid: false, error: e.message }; }
 }

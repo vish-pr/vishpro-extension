@@ -13,7 +13,7 @@ export const elements = {
   currentTabExtractionContent: document.getElementById('currentTabExtractionContent'),
   historyTabContent: document.getElementById('historyTabContent'),
   actionsTabContent: document.getElementById('actionsTabContent'),
-  extractionTabs: document.querySelectorAll('[role="tablist"] .tab'),
+  extractionTabs: document.querySelectorAll('#extractionPanel [role="tablist"] .tab'),
 
   // OpenRouter settings
   openrouterApiKey: document.getElementById('openrouterApiKey'),
@@ -29,6 +29,10 @@ export const elements = {
   // Settings tabs
   settingsModelsTab: document.getElementById('settingsModelsTab'),
   settingsUiTab: document.getElementById('settingsUiTab'),
+
+  // Model stats (in extraction panel)
+  statsTabContent: document.getElementById('statsTabContent'),
+  modelStatsContainer: document.getElementById('modelStatsContainer'),
 
   // UI settings
   themeSelector: document.getElementById('themeSelector'),

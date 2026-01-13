@@ -188,3 +188,23 @@ html { transition: background-color 0.3s ease, color 0.2s ease; }
   &:active > div:first-child { transform: scale(0.95); }
   &.border-primary { background: oklch(var(--bc) / 0.06); }
 }
+
+/* Model stats cards */
+.model-stat-card {
+  transition: all 0.2s ease;
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px oklch(0 0 0 / 0.15);
+  }
+}
+
+.stats-summary {
+  background: linear-gradient(135deg, oklch(var(--b3)) 0%, oklch(var(--b2)) 100%);
+}
+
+/* Radial progress custom styling */
+.radial-progress {
+  --thickness: 3px;
+  background: oklch(var(--bc) / 0.08);
+}
+
