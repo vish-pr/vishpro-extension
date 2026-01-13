@@ -1,7 +1,8 @@
 // Chat Functionality
 import { elements } from './dom.js';
 import { logAction } from './storage.js';
-import { renderMarkdown } from './markdown.js';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 // Message history for up/down arrow navigation
 const messageHistory = [];
@@ -91,7 +92,7 @@ export function addMessage(role, content, { timeout = null } = {}) {
     bubbleDiv.appendChild(errorSpan);
   } else {
     bubbleDiv.className = `chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm`;
-    bubbleDiv.innerHTML = renderMarkdown(content);
+    bubbleDiv.innerHTML = DOMPurify.sanitize(marked.parse(content, { breaks: true }));
   }
   messageDiv.appendChild(bubbleDiv);
 

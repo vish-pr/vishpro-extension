@@ -5,7 +5,7 @@
  */
 
 import { getBrowserState } from '../browser-state.js';
-import { CHAT_RESPONSE } from './chat-action.js';
+import { SUMMARY_TOOL } from './summary-action.js';
 
 /**
  * Execute a script function in a tab
@@ -670,7 +670,7 @@ const BROWSER_ACTION_SYSTEM_PROMPT = `You are a browser automation assistant. Ex
 1. Start with READ_PAGE to see page content
 2. Use element IDs from READ_PAGE for clicks/forms
 3. Chain actions: READ_PAGE -> FILL_FORM -> CLICK_ELEMENT -> WAIT_FOR_LOAD
-4. Call CHAT_RESPONSE when task is complete
+4. Call SUMMARY_TOOL when task is complete
 
 **Element IDs:** READ_PAGE assigns numeric IDs to elements. Use these IDs (not CSS selectors) for CLICK_ELEMENT, FILL_FORM, etc.
 
@@ -703,26 +703,17 @@ export const browserActionRouter = {
     required: ['user_message'],
     additionalProperties: false
   },
-  output_schema: {
-    type: 'object',
-    properties: {
-      response: { type: 'string' },
-      success: { type: 'boolean' }
-    },
-    additionalProperties: false
-  },
   steps: [
     {
-      llm: {
-        system_prompt: BROWSER_ACTION_SYSTEM_PROMPT,
-        message: `User request: {{user_message}}
+      type: 'llm',
+      system_prompt: BROWSER_ACTION_SYSTEM_PROMPT,
+      message: `User request: {{user_message}}
 {{#instructions}}
 Instructions: {{instructions}}
 {{/instructions}}
 Execute the appropriate browser actions. The browser state shows current page content if available.`,
-        intelligence: 'MEDIUM'
-      },
-      choice: {
+      intelligence: 'MEDIUM',
+      tool_choice: {
         available_actions: [
           READ_PAGE.name,
           CLICK_ELEMENT.name,
@@ -736,12 +727,11 @@ Execute the appropriate browser actions. The browser state shows current page co
           WAIT_FOR_ELEMENT.name,
           GO_BACK.name,
           GO_FORWARD.name,
-          CHAT_RESPONSE
+          SUMMARY_TOOL
         ],
-        stop_action: CHAT_RESPONSE,
+        stop_action: SUMMARY_TOOL,
         max_iterations: 7
-      },
-      use_full_browser_state: true
+      }
     }
   ]
 };

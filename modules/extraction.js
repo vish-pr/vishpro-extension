@@ -1,10 +1,18 @@
 // Content Extraction
 import { elements } from './dom.js';
-import { isSpecialPage, sleep } from './utils.js';
 import { saveExtraction, logAction } from './storage.js';
 import { addMessage } from './chat.js';
 import { switchToTab, loadTabContent } from './history.js';
 import { ContentAction } from './content-actions.js';
+
+function isSpecialPage(url) {
+  return url.startsWith('chrome://') ||
+         url.startsWith('edge://') ||
+         url.startsWith('about:') ||
+         url.startsWith('chrome-extension://');
+}
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const EXTRACT_ICONS = {
   DEFAULT: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg> Extract',

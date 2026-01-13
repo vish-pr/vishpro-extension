@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prebuild": "rm -rf dist && mkdir -p dist && cp manifest.json icon-128.png sidepanel.html dist/",
+    "test": "find . -name '*.test.js' -not -path './node_modules/*' -exec node {} \\;",
+    "prebuild": "npm test && rm -rf dist && mkdir -p dist && cp manifest.json icon-128.png sidepanel.html dist/",
     "build": "esbuild sidepanel.js background.js content.js --bundle --outdir=dist --format=esm --minify && npm run build:css",
     "build:css": "tailwindcss -i ./input.css -o ./dist/styles.css --minify",
     "prewatch": "npm run prebuild",
@@ -12,6 +13,10 @@
     "watch:css": "tailwindcss -i ./input.css -o ./dist/styles.css --watch"
   },
   "dependencies": {
+    "dompurify": "^3.3.1",
+    "marked": "^17.0.1",
+    "match-sorter": "^8.2.0",
+    "mustache": "^4.2.0",
     "sortablejs": "^1.15.6"
   },
   "devDependencies": {

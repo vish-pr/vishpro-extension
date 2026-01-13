@@ -5,7 +5,8 @@
  */
 
 import { BROWSER_ACTION } from './browser-actions.js';
-import { CHAT_RESPONSE } from './chat-action.js';
+import { SUMMARY_TOOL } from './summary-action.js';
+import { LLM_TOOL } from './llm-action.js';
 
 /**
  * Action name constant
@@ -28,7 +29,7 @@ IMPORTANT: Always call a tool.`;
  */
 export const routerAction = {
   name: BROWSER_ROUTER,
-  description: 'Top-level router that decides whether a user request needs browser interaction or can be answered directly. Routes to BROWSER_ACTION for page reading, clicking, form filling, navigation, or CHAT_RESPONSE for conversational replies.',
+  description: 'Top-level router that decides whether a user request needs browser interaction, general knowledge, or final summary. Routes to BROWSER_ACTION for page interaction, LLM_TOOL for knowledge/reasoning questions, or SUMMARY_TOOL to return results to user.',
   input_schema: {
     type: 'object',
     properties: {
@@ -40,28 +41,20 @@ export const routerAction = {
     required: ['user_message'],
     additionalProperties: false
   },
-  output_schema: {
-    type: 'object',
-    properties: {
-      response: { type: 'string' },
-      success: { type: 'boolean' }
-    },
-    additionalProperties: false
-  },
   steps: [
     {
-      // Tier-1 LLM choice: BROWSER_ACTION or CHAT_RESPONSE
-      llm: {
-        system_prompt: TIER1_SYSTEM_PROMPT,
-        message: `{{user_message}}`,
-        intelligence: 'MEDIUM'
-      },
-      choice: {
+      // Tier-1 LLM choice: BROWSER_ACTION, LLM_TOOL, or SUMMARY_TOOL
+      type: 'llm',
+      system_prompt: TIER1_SYSTEM_PROMPT,
+      message: `{{user_message}}`,
+      intelligence: 'MEDIUM',
+      tool_choice: {
         available_actions: [
           BROWSER_ACTION,
-          CHAT_RESPONSE
+          LLM_TOOL,
+          SUMMARY_TOOL
         ],
-        stop_action: CHAT_RESPONSE
+        stop_action: SUMMARY_TOOL
       }
     }
   ]

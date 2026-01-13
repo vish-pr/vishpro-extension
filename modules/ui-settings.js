@@ -129,13 +129,16 @@ function getProgressColor(rate) {
 }
 
 function formatModelName(modelId) {
-  const parts = modelId.split('/');
-  return parts.length > 1 ? parts[1] : modelId;
+  const base = modelId.split('@')[0];
+  const parts = base.split('/');
+  return parts.length > 1 ? parts[1] : base;
 }
 
 function formatProvider(modelId) {
-  const parts = modelId.split('/');
-  return parts.length > 1 ? parts[0] : '';
+  const [base, providers] = modelId.split('@');
+  const parts = base.split('/');
+  const vendor = parts.length > 1 ? parts[0] : '';
+  return providers ? `${vendor} via ${providers}` : vendor;
 }
 
 function createStatsCard(modelId, stats) {

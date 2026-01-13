@@ -1,24 +1,67 @@
 /**
  * Action executor - Params in, result out
  */
-import { validateParams } from './context.js';
-import { renderTemplate, resolveSystemPrompt } from './templates.js';
-import logger from '../logger.js';
-import { getBrowserStateBundle } from '../browser-state.js';
-import { generate } from '../llm.js';
-import { browserActions, browserActionRouter } from '../actions/browser-actions.js';
-import { chatAction, CHAT_RESPONSE } from '../actions/chat-action.js';
-import { routerAction } from '../actions/router-action.js';
+import Mustache from 'mustache';
+import logger from './logger.js';
+import { getBrowserStateBundle } from './browser-state.js';
+import { generate } from './llm.js';
+import { actionsRegistry } from './actions/index.js';
 
 const STEP_TIMEOUT_MS = 20000;
 const LLM_TIMEOUT_MS = 40000;
 
-const actionsRegistry = Object.fromEntries(
-  [...browserActions, chatAction, routerAction, browserActionRouter].map(a => [a.name, a])
-);
-logger.info(`Loaded ${Object.keys(actionsRegistry).length} actions`);
+/**
+ * Resolve system prompts - can be strings or LLMConfig objects that generate prompts dynamically
+ */
+async function resolveSystemPrompt(systemPrompt, context) {
+  if (typeof systemPrompt === 'string') {
+    return Mustache.render(systemPrompt, context);
+  }
 
-export const getAction = name => actionsRegistry[name];
+  if (systemPrompt && typeof systemPrompt === 'object') {
+    const metaSystemPrompt = await resolveSystemPrompt(systemPrompt.system_prompt, context);
+    const result = await generate({
+      messages: [
+        { role: 'system', content: metaSystemPrompt },
+        { role: 'user', content: Mustache.render(systemPrompt.message, context) }
+      ],
+      intelligence: systemPrompt.intelligence || 'MEDIUM',
+      schema: {
+        type: 'object',
+        properties: {
+          system_description: { type: 'string', description: 'Generated system prompt' }
+        },
+        required: ['system_description'],
+        additionalProperties: false
+      }
+    });
+    return result.system_description;
+  }
+
+  return String(systemPrompt);
+}
+
+function validateParams(params, schema) {
+  const errors = [];
+  if (schema.required) {
+    for (const field of schema.required) {
+      if (!(field in params) || params[field] === undefined) errors.push(`Missing required field: ${field}`);
+    }
+  }
+  if (schema.properties) {
+    for (const [key, prop] of Object.entries(schema.properties)) {
+      if (key in params && params[key] !== undefined) {
+        const v = params[key], t = prop.type;
+        if (t === 'string' && typeof v !== 'string') errors.push(`Field ${key} must be a string`);
+        else if (t === 'number' && typeof v !== 'number') errors.push(`Field ${key} must be a number`);
+        else if (t === 'boolean' && typeof v !== 'boolean') errors.push(`Field ${key} must be a boolean`);
+        else if (t === 'array' && !Array.isArray(v)) errors.push(`Field ${key} must be an array`);
+        else if (t === 'object' && (typeof v !== 'object' || Array.isArray(v))) errors.push(`Field ${key} must be an object`);
+      }
+    }
+  }
+  return { valid: errors.length === 0, errors };
+}
 
 export async function executeAction(action, params = {}) {
   logger.info(`Action: ${action.name}`, { params });
@@ -51,62 +94,49 @@ async function executeStep(step, params, prevResult) {
   if (typeof step === 'function') {
     return withTimeout(step(params, prevResult), STEP_TIMEOUT_MS);
   }
-  if (step.action) {
-    const subAction = actionsRegistry[step.action];
-    if (!subAction) throw new Error(`Action not found: ${step.action}`);
-    return executeAction(subAction, step.mapParams ? step.mapParams(params, prevResult) : params);
+  if (step.type === 'llm') {
+    return executeLLMStep(step, params, prevResult);
   }
-  if (step.llm) return executeLLMStep(step, params);
-  throw new Error('Invalid step type');
+  throw new Error(`Unknown step type: ${JSON.stringify(step)}`);
 }
 
-async function executeLLMStep(step, params) {
-  const { llm, choice } = step;
+async function executeLLMStep(step, params, prevResult = {}) {
+  const { system_prompt, message, intelligence, output_schema, tool_choice } = step;
 
-  const templateCtx = { ...params };
-
-  // Inject available_tools and decision_guide for actions with choice
-  if (choice?.available_actions) {
-    templateCtx.available_tools = buildToolDescriptions(choice.available_actions, choice.stop_action);
-    templateCtx.decision_guide = buildDecisionGuide(choice.available_actions);
+  // Validate: must have either output_schema or tool_choice
+  if (!output_schema && !tool_choice) {
+    throw new Error('LLM step must have either output_schema or tool_choice');
   }
 
-  const systemPrompt = await resolveSystemPrompt(llm.system_prompt, templateCtx, generate);
-  const message = renderTemplate(llm.message, templateCtx);
+  // Merge previous step result into template context for chained LLM calls
+  const templateCtx = { ...params, ...prevResult };
 
-  if (!choice) {
-    // Single LLM call with schema - wrap schema in a tool
-    const tools = [{
-      type: 'function',
-      function: {
-        name: 'respond',
-        description: 'Generate structured response',
-        parameters: llm.schema
-      }
-    }];
+  // Inject available_tools and decision_guide for actions with tool_choice
+  if (tool_choice?.available_actions) {
+    templateCtx.available_tools = buildToolDescriptions(tool_choice.available_actions, tool_choice.stop_action);
+    templateCtx.decision_guide = buildDecisionGuide(tool_choice.available_actions);
+  }
 
+  const resolvedSystemPrompt = await resolveSystemPrompt(system_prompt, templateCtx);
+  const resolvedMessage = Mustache.render(message, templateCtx);
+
+  if (!tool_choice) {
+    // Single LLM call - use structured output schema
     const messages = await insertBrowserState([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: message }
+      { role: 'system', content: resolvedSystemPrompt },
+      { role: 'user', content: resolvedMessage }
     ]);
 
-    const result = await withTimeout(
-      generate({ messages, intelligence: llm.intelligence || 'MEDIUM', tools }),
+    return withTimeout(
+      generate({ messages, intelligence: intelligence || 'MEDIUM', schema: output_schema }),
       LLM_TIMEOUT_MS
     );
-
-    // Extract arguments from tool call
-    if (result.tool_calls?.length) {
-      return JSON.parse(result.tool_calls[0].function.arguments || '{}');
-    }
-    // Fallback if no tool call
-    return result.content ? { response: result.content, success: true } : result;
   }
-  return executeMultiTurn(systemPrompt, message, choice, llm.intelligence);
+  return executeMultiTurn(resolvedSystemPrompt, resolvedMessage, tool_choice, intelligence);
 }
 
 async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligence) {
-  const { available_actions, stop_action = CHAT_RESPONSE, max_iterations = 5 } = choice;
+  const { available_actions, stop_action, max_iterations = 5 } = choice;
   const conversation = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: initialMessage }
@@ -127,12 +157,33 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
     );
 
     if (!llmResponse.tool_calls?.length) {
-      throw new Error('LLM did not return expected tool call');
+      // LLM returned text instead of tool call - add to conversation and prompt again
+      logger.warn('LLM returned text instead of tool call, prompting to use tools');
+      conversation.push({
+        role: 'assistant',
+        content: llmResponse.content || 'I need to use a tool to help with this.'
+      });
+      conversation.push({
+        role: 'user',
+        content: 'Please call one of the available tools to proceed.'
+      });
+      continue;
     }
 
     const toolCall = llmResponse.tool_calls[0];
     const toolName = toolCall.function.name;
-    const toolArgs = JSON.parse(toolCall.function.arguments || '{}');
+    let toolArgs;
+    try {
+      toolArgs = JSON.parse(toolCall.function.arguments || '{}');
+    } catch (e) {
+      logger.error('Invalid JSON in tool arguments', { raw: toolCall.function.arguments, error: e.message });
+      conversation.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify({ error: 'Invalid JSON in tool arguments' })
+      });
+      continue;
+    }
 
     logger.info(`Tool call: ${toolName}`, { id: toolCall.id });
 
@@ -156,12 +207,12 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
 
     const actionParams = pickParams(toolArgs, targetAction);
     if (toolName === stop_action) {
-      actionParams.conversation_history = formatConversationHistory(conversation);
+      actionParams.messages = JSON.stringify(conversation, null, 2);
     }
 
     try {
       const result = await executeAction(targetAction, actionParams);
-      if (toolName === stop_action) return result;
+      if (toolName === stop_action) return unwrapStopResult(result);
 
       // Send result as tool response
       conversation.push({
@@ -208,10 +259,11 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
     }]
   });
 
-  return executeAction(actionsRegistry[stop_action], {
+  const result = await executeAction(actionsRegistry[stop_action], {
     response: stopResponse,
-    conversation_history: formatConversationHistory(conversation)
+    messages: JSON.stringify(conversation, null, 2)
   });
+  return unwrapStopResult(result);
 }
 
 function pickParams(source, actionDef) {
@@ -219,36 +271,6 @@ function pickParams(source, actionDef) {
   return Object.fromEntries(
     Object.keys(actionDef.input_schema.properties).filter(k => k in source).map(k => [k, source[k]])
   );
-}
-
-function formatConversationHistory(conversation) {
-  const lines = [];
-  let turn = 0;
-
-  for (let i = 0; i < conversation.length; i++) {
-    const msg = conversation[i];
-    if (msg.role !== 'assistant' || !msg.tool_calls?.length) continue;
-
-    const toolCall = msg.tool_calls[0];
-    const action = toolCall.function.name;
-    const params = JSON.parse(toolCall.function.arguments || '{}');
-    turn++;
-
-    let line = `Turn ${turn}: ${action}`;
-    if (params.instructions) line += `\n  Instructions: ${params.instructions}`;
-
-    // Find corresponding tool response
-    const toolResponse = conversation[i + 1];
-    if (toolResponse?.role === 'tool') {
-      const content = toolResponse.content;
-      const truncated = content.length > 500 ? content.substring(0, 500) + '...' : content;
-      line += `\n  Result: ${truncated}`;
-    }
-
-    lines.push(line);
-  }
-
-  return lines.length ? lines.join('\n\n') : 'No previous actions in this conversation.';
 }
 
 async function insertBrowserState(conversation) {
@@ -323,6 +345,15 @@ function buildDecisionGuide(actionNames) {
     }
   }
   return lines.join('\n');
+}
+
+/**
+ * Unwrap stop action result to extract user-facing message
+ * Convention: check for 'message' field first, then 'response', else stringify
+ */
+function unwrapStopResult(result) {
+  if (typeof result === 'string') return result;
+  return result?.message || result?.response || JSON.stringify(result);
 }
 
 const withTimeout = (promise, ms) => Promise.race([

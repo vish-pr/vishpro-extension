@@ -1,7 +1,7 @@
 // Background Service Worker
 import { verifyApiKey as llmVerifyApiKey, isInitialized } from './modules/llm.js';
-import { executeAction, getAction } from './modules/orchestrator/executor.js';
-import { BROWSER_ROUTER } from './modules/actions/router-action.js';
+import { executeAction } from './modules/executor.js';
+import { getAction, BROWSER_ROUTER } from './modules/actions/index.js';
 import logger from './modules/logger.js';
 import { getBrowserState } from './modules/browser-state.js';
 
@@ -47,18 +47,11 @@ async function handleUserMessage({ message }) {
       throw new Error('OpenRouter API key not configured. Please add your API key in settings.');
     }
 
-    // Get the router action and execute it
     const action = getAction(BROWSER_ROUTER);
-    if (!action) {
-      throw new Error(`Action not found: ${BROWSER_ROUTER}`);
-    }
-
     logger.info('Executing action', { action: BROWSER_ROUTER });
     const result = await executeAction(action, { user_message: message });
-    logger.info('Action completed', { hasResponse: !!result.response });
-
-    // Return the response from the action
-    return result.response || JSON.stringify(result, null, 2);
+    logger.info('Action completed');
+    return result;
   } catch (error) {
     logger.error('Action execution error in background', {
       error: error.message,

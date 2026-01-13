@@ -1,5 +1,5 @@
 import logger from './logger.js';
-import { getModelStatsCounter } from './time-bucket-counter.js';
+import { getModelStatsCounter, modelStatsKey } from './time-bucket-counter.js';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const SITE_NAME = 'VishPro Browser Agent';
@@ -36,9 +36,19 @@ function recordFailure(model) {
   else if (t.skips >= t.failures) { t.failures++; t.skips = 0; }
 }
 
-async function callAPI(model, messages, tools, only, noToolChoice) {
-  const request = { model, messages, tools };
-  if (!noToolChoice) request.tool_choice = 'required';
+async function callAPI(model, messages, tools, only, noToolChoice, schema) {
+  const request = { model, messages };
+
+  if (tools) {
+    request.tools = tools;
+    if (!noToolChoice) request.tool_choice = 'required';
+  } else if (schema) {
+    request.response_format = {
+      type: 'json_schema',
+      json_schema: { name: 'response', strict: true, schema }
+    };
+  }
+
   if (only?.length) request.provider = { only };
   logger.debug(`LLM Request Details`, { request });
   const response = await fetch(ENDPOINT, {
@@ -54,29 +64,40 @@ async function callAPI(model, messages, tools, only, noToolChoice) {
   }
   const message = (await response.json()).choices?.[0]?.message;
   if (!message) throw new Error('Empty response from API');
+
+  // For structured schema, parse JSON from content
+  if (schema && message.content) {
+    try {
+      return JSON.parse(message.content);
+    } catch (e) {
+      logger.error('Failed to parse schema response', { content: message.content, error: e.message });
+      throw new Error(`Invalid JSON in schema response: ${e.message}`);
+    }
+  }
   return message;
 }
 
-export async function generate({ messages, intelligence = 'MEDIUM', tools }) {
-  if (!tools?.length) throw new Error('Tools array is required');
+export async function generate({ messages, intelligence = 'MEDIUM', tools, schema }) {
+  if (!tools?.length && !schema) throw new Error('Either tools or schema is required');
   if (!await isInitialized()) throw new Error('OpenRouter API key not configured');
   const cascadingModels = await getCascadingModels(intelligence);
   let lastError = null;
   for (const { model, only, noToolChoice } of cascadingModels) {
     if (shouldSkip(model)) continue;
     try {
-      logger.info(`LLM Request: ${model}`, { messageCount: messages.length, intelligence, toolCount: tools.length });
-      const result = await callAPI(model, messages, tools, only, noToolChoice);
-      if (result.tool_calls?.length && !result.tool_calls[0].function?.name) throw new Error('Invalid tool call: missing function name');
+      const logInfo = tools ? { toolCount: tools.length } : { schema: true };
+      logger.info(`LLM Request: ${model}`, { messageCount: messages.length, intelligence, ...logInfo });
+      const result = await callAPI(model, messages, tools, only, noToolChoice, schema);
+      if (tools && result.tool_calls?.length && !result.tool_calls[0].function?.name) throw new Error('Invalid tool call: missing function name');
       logger.info(`LLM Response: ${model}`);
       logger.debug(`LLM Response Details`, { model, response: result });
       modelFailures.delete(model);
-      getModelStatsCounter().increment(model, 'success').catch(e => logger.warn('Stats increment failed', { error: e.message }));
+      getModelStatsCounter().increment(modelStatsKey(model, only), 'success').catch(e => logger.warn('Stats increment failed', { error: e.message }));
       return result;
     } catch (error) {
       lastError = error;
       recordFailure(model);
-      getModelStatsCounter().increment(model, 'error').catch(e => logger.warn('Stats increment failed', { error: e.message }));
+      getModelStatsCounter().increment(modelStatsKey(model, only), 'error').catch(e => logger.warn('Stats increment failed', { error: e.message }));
       logger.warn(`LLM Failure: ${model}`, { model, error: error.message });
     }
   }
@@ -141,7 +162,7 @@ const VERIFY_TOOL = [{
 
 export async function verifyModel(modelId, providers = []) {
   if (!await isInitialized()) return { valid: false, error: 'API key not configured' };
-  const baseRequest = { model: modelId, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1, tools: VERIFY_TOOL };
+  const baseRequest = { model: modelId, messages: [{ role: 'user', content: 'Call the test function' }], max_tokens: 500, tools: VERIFY_TOOL };
   if (providers.length) baseRequest.provider = { only: providers };
 
   // First try with tool_choice

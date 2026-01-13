@@ -3,8 +3,9 @@ import { elements } from './dom.js';
 import * as storage from './storage.js';
 import { addMessage } from './chat.js';
 import { setApiKey, getModels, setModels, getDefaultModels, fetchAvailableModels, fetchAvailableProviders, verifyModel } from './llm.js';
-import { getModelStatsCounter } from './time-bucket-counter.js';
+import { getModelStatsCounter, modelStatsKey } from './time-bucket-counter.js';
 import Sortable from 'sortablejs';
+import { matchSorter } from 'match-sorter';
 
 let availableModels = [], availableProviders = [], currentModels = null;
 const verificationStatus = new Map();
@@ -34,7 +35,8 @@ async function verifyAllModels() {
           currentModels[tier][i] = [model, providers, { noToolChoice: true }];
           needsSave = true;
         }
-        await counter.increment(model, result.valid ? 'success' : 'error');
+        await counter.increment(modelStatsKey(model, providers), result.valid ? 'success' : 'error');
+        await refreshStats();
         renderTierModels(tier);
       }));
     }
@@ -157,9 +159,9 @@ function createEditingModelItem(model, provider, tier, index) {
 }
 
 function updateAutocomplete(input, listEl, items, key, dataAttr) {
-  const q = input.value.toLowerCase().trim();
+  const q = input.value.trim();
   const matches = q
-    ? items.filter(m => m[key].toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
+    ? matchSorter(items, q, { keys: [key, 'name'] })
     : [...items].sort((a, b) => a[key].localeCompare(b[key]));
   if (!matches.length) { listEl.classList.add('hidden'); return; }
   listEl.innerHTML = matches.map(m => `<li class="px-2 py-1.5 rounded cursor-pointer hover:bg-base-300 transition-colors text-xs" data-${dataAttr.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}="${m[key]}"><div class="font-mono truncate">${m[key]}</div><div class="opacity-50 text-[10px] truncate">${m.name}</div></li>`).join('');
@@ -192,7 +194,7 @@ async function renderTierModels(tier) {
     return;
   }
   if (!cachedStats) await refreshStats();
-  models.forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, cachedStats[m])));
+  models.forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, cachedStats[modelStatsKey(m, p)])));
 }
 
 async function renderAllModels() {
@@ -237,7 +239,8 @@ async function handleModelSave(tier, index) {
   addMessage('system', `Verifying ${model}...`);
   const result = await verifyModel(model, providers);
   const counter = getModelStatsCounter();
-  await counter.increment(model, result.valid ? 'success' : 'error');
+  await counter.increment(modelStatsKey(model, providers), result.valid ? 'success' : 'error');
+  await refreshStats();
   saveBtn.disabled = false;
   saveBtn.innerHTML = originalHtml;
   verificationStatus.set(`${tier}:${index}`, { verified: result.valid, error: result.error });
@@ -266,7 +269,7 @@ async function handleModelAdd(tier) {
   const index = currentModels[tier].length - 1;
   // Re-render existing models then add editing row
   if (!cachedStats) await refreshStats();
-  currentModels[tier].slice(0, -1).forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, cachedStats[m])));
+  currentModels[tier].slice(0, -1).forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, cachedStats[modelStatsKey(m, p)])));
   listEl.appendChild(createEditingModelItem('', [''], tier, index));
   listEl.querySelector('.list-row:last-child .model-name-input').focus();
 }
