@@ -36,7 +36,6 @@ async function verifyAllModels() {
           needsSave = true;
         }
         await counter.increment(modelStatsKey(model, providers), result.valid ? 'success' : 'error');
-        await refreshStats();
         renderTierModels(tier);
       }));
     }
@@ -64,12 +63,13 @@ function updateHeaderTitle() {
   });
 }
 
-function toggleSettings(show) {
+async function toggleSettings(show) {
   elements.settingsPanel.classList.toggle('hidden', !show);
   elements.settingsToggle.classList.toggle('btn-active', show);
   if (show) {
     elements.extractionPanel.classList.add('hidden');
     elements.historyToggle.classList.remove('btn-active');
+    await renderAllModels();
   }
 }
 
@@ -107,14 +107,9 @@ function createModelItem(model, provider, opts, tier, index, stats) {
   const badgesEl = el.querySelector('.provider-badges');
   const providers = Array.isArray(provider) ? provider.filter(Boolean) : [];
   if (providers.length) {
-    providers.forEach(p => {
-      const badge = document.createElement('span');
-      badge.className = 'badge badge-ghost badge-xs';
-      badge.textContent = p;
-      badgesEl.appendChild(badge);
-    });
+    badgesEl.innerHTML = providers.map(p => `<span class="badge badge-ghost badge-xs">${p}</span>`).join('');
   } else {
-    badgesEl.innerHTML = '<span class="text-[10px] opacity-40">auto routing</span>';
+    badgesEl.innerHTML = `<span class="text-xs opacity-50">auto routing</span>`;
   }
 
   // Status indicator (solid lights, no animation)
@@ -123,7 +118,8 @@ function createModelItem(model, provider, opts, tier, index, stats) {
   if (status?.verified === true) {
     statusEl.innerHTML = `<div class="tooltip tooltip-right" data-tip="Verified"><div class="status status-success"></div></div>`;
   } else if (status?.verified === false) {
-    statusEl.innerHTML = `<div class="tooltip tooltip-right tooltip-error" data-tip="${(status.error || 'Unknown error').replace(/"/g, '&quot;')}"><div class="status status-error"></div></div>`;
+    const errorMsg = (status.error || 'Unknown error').replace(/"/g, '&quot;');
+    statusEl.innerHTML = `<div class="tooltip tooltip-right tooltip-error" data-tip="${errorMsg}"><div class="status status-error"></div></div>`;
   }
 
   // Warning indicator for noToolChoice
@@ -142,7 +138,7 @@ function createModelItem(model, provider, opts, tier, index, stats) {
     if (total > 0) {
       const rate = Math.round((success / total) * 100);
       const rateClass = rate >= 90 ? 'text-success' : rate >= 70 ? 'text-warning' : 'text-error';
-      statsEl.innerHTML = `<span class="${rateClass} font-medium">${rate}%</span><span class="opacity-40">·</span><span>${total} calls</span>`;
+      statsEl.innerHTML = `<span class="${rateClass} font-medium">${rate}%</span><span class="opacity-50">·</span><span>${total} calls</span>`;
     }
   }
 
@@ -164,7 +160,13 @@ function updateAutocomplete(input, listEl, items, key, dataAttr) {
     ? matchSorter(items, q, { keys: [key, 'name'] })
     : [...items].sort((a, b) => a[key].localeCompare(b[key]));
   if (!matches.length) { listEl.classList.add('hidden'); return; }
-  listEl.innerHTML = matches.map(m => `<li class="px-2 py-1.5 rounded cursor-pointer hover:bg-base-300 transition-colors text-xs" data-${dataAttr.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}="${m[key]}"><div class="font-mono truncate">${m[key]}</div><div class="opacity-50 text-[10px] truncate">${m.name}</div></li>`).join('');
+  const attr = dataAttr.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
+  listEl.innerHTML = matches.map(m =>
+    `<li class="px-2 py-2 rounded-lg cursor-pointer hover:bg-base-300 text-xs" data-${attr}="${m[key]}">
+      <div class="font-mono truncate">${m[key]}</div>
+      <div class="opacity-50 text-xs truncate">${m.name}</div>
+    </li>`
+  ).join('');
   listEl.classList.remove('hidden');
 }
 
@@ -178,28 +180,22 @@ function updateProviderAutocomplete(input, el, modelInput) {
 
 const getListEl = tier => elements[`modelList${tier.charAt(0) + tier.slice(1).toLowerCase()}`];
 
-let cachedStats = null;
-
-async function refreshStats() {
-  const counter = getModelStatsCounter();
-  cachedStats = await counter.getAllStats();
-}
+// Stats accessed directly from singleton via getModelStatsCounter().getAllStats()
 
 async function renderTierModels(tier) {
   const listEl = getListEl(tier);
   listEl.innerHTML = '';
   const models = currentModels[tier] || [];
   if (!models.length) {
-    listEl.innerHTML = '<li class="text-center text-xs opacity-50 py-4">No models configured</li>';
+    listEl.innerHTML = `<li class="text-center text-xs opacity-50 py-4">No models configured</li>`;
     return;
   }
-  if (!cachedStats) await refreshStats();
-  models.forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, cachedStats[modelStatsKey(m, p)])));
+  const stats = await getModelStatsCounter().getAllStats();
+  models.forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, stats[modelStatsKey(m, p)])));
 }
 
 async function renderAllModels() {
-  await refreshStats();
-  TIERS.forEach(renderTierModels);
+  for (const tier of TIERS) await renderTierModels(tier);
 }
 
 const saveModels = () => setModels(currentModels);
@@ -235,12 +231,11 @@ async function handleModelSave(tier, index) {
   if (!model) { addMessage('system', '✗ Model name is required'); return; }
   const originalHtml = saveBtn.innerHTML;
   saveBtn.disabled = true;
-  saveBtn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
+  saveBtn.innerHTML = `<span class="loading loading-spinner loading-xs"></span>`;
   addMessage('system', `Verifying ${model}...`);
   const result = await verifyModel(model, providers);
   const counter = getModelStatsCounter();
   await counter.increment(modelStatsKey(model, providers), result.valid ? 'success' : 'error');
-  await refreshStats();
   saveBtn.disabled = false;
   saveBtn.innerHTML = originalHtml;
   verificationStatus.set(`${tier}:${index}`, { verified: result.valid, error: result.error });
@@ -268,8 +263,8 @@ async function handleModelAdd(tier) {
   currentModels[tier].push(['', ['']]);
   const index = currentModels[tier].length - 1;
   // Re-render existing models then add editing row
-  if (!cachedStats) await refreshStats();
-  currentModels[tier].slice(0, -1).forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, cachedStats[modelStatsKey(m, p)])));
+  const stats = await getModelStatsCounter().getAllStats();
+  currentModels[tier].slice(0, -1).forEach(([m, p, opts], i) => listEl.appendChild(createModelItem(m, p, opts, tier, i, stats[modelStatsKey(m, p)])));
   listEl.appendChild(createEditingModelItem('', [''], tier, index));
   listEl.querySelector('.list-row:last-child .model-name-input').focus();
 }
