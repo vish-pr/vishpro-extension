@@ -5,7 +5,7 @@
  */
 
 import { BROWSER_ACTION } from './browser-actions.js';
-import { SUMMARY_TOOL } from './summary-action.js';
+import { FINAL_RESPONSE } from './final-response-action.js';
 import { LLM_TOOL } from './llm-action.js';
 
 /**
@@ -29,7 +29,7 @@ IMPORTANT: Always call a tool.`;
  */
 export const routerAction = {
   name: BROWSER_ROUTER,
-  description: 'Top-level router that decides whether a user request needs browser interaction, general knowledge, or final summary. Routes to BROWSER_ACTION for page interaction, LLM_TOOL for knowledge/reasoning questions, or SUMMARY_TOOL to return results to user.',
+  description: 'Top-level router that decides whether a user request needs browser interaction, general knowledge, or final response. Routes to BROWSER_ACTION for page interaction, LLM_TOOL for knowledge/reasoning questions, or FINAL_RESPONSE to return results to user.',
   input_schema: {
     type: 'object',
     properties: {
@@ -43,7 +43,7 @@ export const routerAction = {
   },
   steps: [
     {
-      // Tier-1 LLM choice: BROWSER_ACTION, LLM_TOOL, or SUMMARY_TOOL
+      // Tier-1 LLM choice: BROWSER_ACTION, LLM_TOOL, or FINAL_RESPONSE
       type: 'llm',
       system_prompt: TIER1_SYSTEM_PROMPT,
       message: `{{user_message}}`,
@@ -52,9 +52,9 @@ export const routerAction = {
         available_actions: [
           BROWSER_ACTION,
           LLM_TOOL,
-          SUMMARY_TOOL
+          FINAL_RESPONSE
         ],
-        stop_action: SUMMARY_TOOL,
+        stop_action: FINAL_RESPONSE,
         max_iterations: 5
       }
     }

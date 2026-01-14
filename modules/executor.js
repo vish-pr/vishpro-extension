@@ -220,16 +220,7 @@ function buildTools(availableActions) {
       function: {
         name: action.name,
         description: action.description,
-        parameters: {
-          type: 'object',
-          properties: {
-            justification: { type: 'string', description: 'Why this tool is appropriate' },
-            instructions: { type: 'string', description: 'Instructions for the tool' },
-            ...(action.input_schema?.properties || {})
-          },
-          required: ['justification', 'instructions', ...(action.input_schema?.required || [])],
-          additionalProperties: false
-        }
+        parameters: action.input_schema
       }
     };
   }).filter(Boolean);
@@ -251,7 +242,8 @@ function buildDecisionGuide(actionNames) {
 }
 
 function unwrapStopResult(result) {
-  return typeof result === 'string' ? result : result?.message || result?.response || JSON.stringify(result);
+  if (typeof result === 'string') return result;
+  return result?.final_answer || JSON.stringify(result);
 }
 
 const withTimeout = (promise, ms) => Promise.race([

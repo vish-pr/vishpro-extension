@@ -38,6 +38,7 @@ for (const [name, action] of Object.entries(actionsRegistry)) {
   // Actions must have required fields
   assert(action.name === name, `${name}: action.name must match registry key`);
   assert(action.description, `${name}: action must have description`);
+  assert(action.input_schema, `${name}: action must have input_schema`);
   assert(Array.isArray(action.steps) && action.steps.length > 0, `${name}: action must have steps array`);
 
   // Track available variables: start with action's input_schema properties

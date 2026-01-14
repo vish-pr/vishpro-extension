@@ -1,12 +1,12 @@
 /**
- * Summary action - stop action that summarizes conversation messages
+ * Final response action - terminates the task with a user-facing answer
  * Uses two-stage LLM: first generates a tailored system prompt, then extracts/summarizes
  */
 
 /**
  * Action name constant
  */
-export const SUMMARY_TOOL = 'SUMMARY_TOOL';
+export const FINAL_RESPONSE = 'FINAL_RESPONSE';
 
 /**
  * System prompt for generating the extraction prompt
@@ -22,27 +22,39 @@ Your goal is to create a system prompt that:
 The system prompt you create will be used by another LLM to process the conversation messages and extract only what matters to the user.`;
 
 /**
- * SUMMARY_TOOL action
- * Extracts and summarizes conversation messages when objective is achieved
- * This is a "stop action" that ends the agentic loop with summarized results
+ * FINAL_RESPONSE action
+ * Produces the final user-facing answer and terminates the task
  */
-export const summaryAction = {
-  name: SUMMARY_TOOL,
-  description: 'Extracts and summarizes conversation messages when objective is achieved and results need to be returned to user. Best for: formatting final results, condensing collected information into user-friendly output, removing intermediate steps and keeping only relevant data.',
+export const finalResponseAction = {
+  name: FINAL_RESPONSE,
+  description: `MANDATORY FINAL STEP.
+
+This tool MUST be called once sufficient information has been obtained
+from previous tool calls. It produces the final user-facing answer.
+
+Rules:
+- This tool TERMINATES the task.
+- After calling FINAL_RESPONSE, no other tools may be called.
+- Do NOT call this tool until the objective is fully achieved.
+- If the answer can be given to the user, this tool MUST be used.
+
+Purpose:
+- Format and present the final result to the user
+- Remove internal reasoning and intermediate steps
+- Convert tool outputs into a clean, user-readable response`,
   examples: [
-    'Summarize what we found',
-    'Give me the final results'
+    'Give me the final answer',
+    'Provide the result to the user',
+    'Return the completed response',
+    'Deliver the outcome',
+    'The task is complete — show the result'
   ],
   input_schema: {
     type: 'object',
     properties: {
       justification: {
         type: 'string',
-        description: 'The justification for summarization'
-      },
-      user_intent: {
-        type: 'string',
-        description: 'The original user intent/question to focus the summary on'
+        description: 'Why the task objective is now complete and ready to be delivered'
       }
     },
     required: ['justification'],
@@ -55,8 +67,6 @@ export const summaryAction = {
       system_prompt: PROMPT_GENERATOR_SYSTEM,
       message: `Create a system prompt for extracting relevant information from data present, remove irrelevant information. Avoid repetition, and keep all relevant information.
 This system prompt will be given to LLM to extract information from data present. You do not need to extract information, but only create a system prompt which is relevant to this data.
-
-{{#user_intent}}User intent: {{user_intent}}{{/user_intent}}
 
 <messages>
 {{messages}}
@@ -85,22 +95,22 @@ This system prompt will be given to LLM to extract information from data present
 </messages>
 
 In your response:
-1. 'message' field: Provide a clean, user-friendly summary of the relevant information with no redundancy
+1. 'final_answer' field: Provide a clean, user-friendly summary of the relevant information with no redundancy
 2. 'method' field: Briefly describe the steps taken to gather this data (2-3 lines for bookkeeping purposes)`,
       intelligence: 'MEDIUM',
       output_schema: {
         type: 'object',
         properties: {
-          message: {
+          final_answer: {
             type: 'string',
-            description: 'Summary of the messages'
+            description: 'The complete, polished answer to present to the user'
           },
           method: {
             type: 'string',
             description: 'Brief description of steps taken to gather this data'
           }
         },
-        required: ['message', 'method'],
+        required: ['final_answer', 'method'],
         additionalProperties: false
       }
     }

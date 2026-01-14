@@ -2,13 +2,13 @@
  * Actions registry - central export for all actions
  */
 import { browserActions, browserActionRouter } from './browser-actions.js';
-import { summaryAction, SUMMARY_TOOL } from './summary-action.js';
+import { finalResponseAction, FINAL_RESPONSE } from './final-response-action.js';
 import { llmAction, LLM_TOOL } from './llm-action.js';
 import { routerAction, BROWSER_ROUTER } from './router-action.js';
 import logger from '../logger.js';
 
 // Re-export constants
-export { SUMMARY_TOOL } from './summary-action.js';
+export { FINAL_RESPONSE } from './final-response-action.js';
 export { LLM_TOOL } from './llm-action.js';
 export { BROWSER_ROUTER } from './router-action.js';
 export { BROWSER_ACTION } from './browser-actions.js';
@@ -16,7 +16,7 @@ export { BROWSER_ACTION } from './browser-actions.js';
 // Build registry from all actions
 const allActions = [
   ...browserActions,
-  summaryAction,
+  finalResponseAction,
   llmAction,
   routerAction,
   browserActionRouter

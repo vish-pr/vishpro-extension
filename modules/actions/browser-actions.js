@@ -5,7 +5,7 @@
  */
 
 import { getBrowserState } from '../browser-state.js';
-import { SUMMARY_TOOL } from './summary-action.js';
+import { FINAL_RESPONSE } from './final-response-action.js';
 
 /**
  * Execute a script function in a tab
@@ -670,7 +670,7 @@ const BROWSER_ACTION_SYSTEM_PROMPT = `You are a browser automation assistant. Ex
 1. Start with READ_PAGE to see page content
 2. Use element IDs from READ_PAGE for clicks/forms
 3. Chain actions: READ_PAGE -> FILL_FORM -> CLICK_ELEMENT -> WAIT_FOR_LOAD
-4. Call SUMMARY_TOOL when task is complete
+4. Call FINAL_RESPONSE when task is complete
 
 **Element IDs:** READ_PAGE assigns numeric IDs to elements. Use these IDs (not CSS selectors) for CLICK_ELEMENT, FILL_FORM, etc.
 
@@ -727,9 +727,9 @@ Execute the appropriate browser actions. The browser state shows current page co
           WAIT_FOR_ELEMENT.name,
           GO_BACK.name,
           GO_FORWARD.name,
-          SUMMARY_TOOL
+          FINAL_RESPONSE
         ],
-        stop_action: SUMMARY_TOOL,
+        stop_action: FINAL_RESPONSE,
         max_iterations: 7
       }
     }
