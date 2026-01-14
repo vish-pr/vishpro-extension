@@ -6,7 +6,7 @@ import { actionsRegistry, BROWSER_ROUTER } from './index.js';
 let failed = 0;
 const assert = (cond, msg) => cond || (console.error(`FAIL: ${msg}`), failed++);
 
-const extractVars = str => new Set((str?.match(/\{\{[#^/]?([a-zA-Z_]\w*)\}\}/g) || []).map(m => m.replace(/[{}#^/]/g, '')));
+const extractVars = str => new Set((str?.match(/\{\{\{?[#^/]?([a-zA-Z_]\w*)\}?\}\}/g) || []).map(m => m.replace(/[{}#^/]/g, '')));
 
 assert(actionsRegistry[BROWSER_ROUTER], `BROWSER_ROUTER not found`);
 
@@ -34,7 +34,7 @@ for (const [name, action] of Object.entries(actionsRegistry)) {
       assert(!step.system_prompt || typeof step.system_prompt === 'string', `${id}: system_prompt must be string`);
       assert(step.system_prompt || hasChoice, `${id}: needs system_prompt or tool_choice`);
 
-      const stepVars = new Set([...availableVars, ...(hasChoice ? ['available_tools', 'decision_guide'] : [])]);
+      const stepVars = new Set([...availableVars, ...(hasChoice ? ['available_tools', 'decision_guide', 'browser_state', 'stop_action'] : [])]);
       for (const v of [...extractVars(step.system_prompt), ...extractVars(step.message)]) {
         assert(stepVars.has(v), `${id}: unknown variable {{${v}}}`);
       }
