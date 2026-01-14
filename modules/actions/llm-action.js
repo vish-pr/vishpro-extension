@@ -56,8 +56,8 @@ export const llmAction = {
       system_prompt: PROMPT_GENERATOR_SYSTEM,
       message: `Create a system prompt for answering the user's query. This system prompt will be given to an LLM to generate a response.
 
-Justification for using LLM tool: {{justification}}
-User's instruction: {{instruction}}
+Justification for using LLM tool: {{{justification}}}
+User's instruction: {{{instruction}}}
 
 Generate a clear, focused system prompt that will guide the LLM to provide the best possible response.`,
       intelligence: 'LOW',
@@ -76,8 +76,8 @@ Generate a clear, focused system prompt that will guide the LLM to provide the b
     {
       // Second LLM step - generate the actual response using the tailored prompt
       type: 'llm',
-      system_prompt: '{{generated_prompt}}',
-      message: `Instruction: {{instruction}}`,
+      system_prompt: '{{{generated_prompt}}}',
+      message: `Instruction: {{{instruction}}}`,
       intelligence: 'HIGH',
       output_schema: {
         type: 'object',

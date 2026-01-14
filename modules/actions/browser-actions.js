@@ -730,26 +730,22 @@ export const browserActionRouter = {
   input_schema: {
     type: 'object',
     properties: {
-      user_message: {
-        type: 'string',
-        description: 'The user\'s natural language request'
-      },
       instructions: {
         type: 'string',
         description: 'Detailed instructions from router about what to accomplish'
       }
     },
-    required: ['user_message'],
+    required: ['instructions'],
     additionalProperties: false
   },
   steps: [
     {
       type: 'llm',
-      message: `User request: {{user_message}}
-{{#instructions}}
-Instructions: {{instructions}}
-{{/instructions}}
-Execute the appropriate browser actions. The browser state shows current page content if available.`,
+      message: `This is current {{{browser_state}}}
+Goal to fulfill is:
+{{{instructions}}}
+
+Please choose a tool to fulfill goal, if already fulfilled please choose {{{stop_action}}}`,
       intelligence: 'MEDIUM',
       tool_choice: {
         available_actions: [

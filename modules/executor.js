@@ -64,27 +64,30 @@ async function executeStep(step, params, prevResult, action) {
 
 async function executeLLMStep(step, params, prevResult = {}, action) {
   const { intelligence, output_schema, tool_choice } = step;
-  const context = { ...params, ...prevResult };
+  const browser_state = await getBrowserStateBundle();
+  const context = { ...params, ...prevResult, browser_state, stop_action: tool_choice?.stop_action };
 
-  const { systemPrompt, message } = resolveStepTemplates(step, action, context);
+  const { systemPrompt, renderMessage } = resolveStepTemplates(step, action);
+  const message = renderMessage(context);
+  const resolvedSystemPrompt = typeof systemPrompt === 'function' ? systemPrompt(context) : systemPrompt;
 
   if (!tool_choice) {
     return withTimeout(
       generate({
-        messages: await insertBrowserState([
-          { role: 'system', content: systemPrompt },
+        messages: [
+          { role: 'system', content: resolvedSystemPrompt },
           { role: 'user', content: message }
-        ]),
+        ],
         intelligence,
         schema: output_schema
       }),
       LLM_TIMEOUT_MS
     );
   }
-  return executeMultiTurn(systemPrompt, message, tool_choice, intelligence);
+  return executeMultiTurn(resolvedSystemPrompt, message, tool_choice, intelligence, renderMessage, context);
 }
 
-async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligence) {
+async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligence, renderMessage, baseContext) {
   const { available_actions, stop_action, max_iterations } = choice;
   const conversation = [
     { role: 'system', content: systemPrompt },
@@ -97,7 +100,7 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
     logger.info(`Turn ${i + 1}/${max_iterations}`);
 
     const llmResponse = await withTimeout(
-      generate({ messages: await insertBrowserState(conversation), intelligence, tools }),
+      generate({ messages: conversation, intelligence, tools }),
       LLM_TIMEOUT_MS
     );
 
@@ -146,6 +149,10 @@ async function executeMultiTurn(systemPrompt, initialMessage, choice, intelligen
         break; // Stop executing remaining tool calls on error
       }
     }
+
+    // Insert complete message with updated browser state at end of turn
+    const browser_state = await getBrowserStateBundle();
+    conversation.push({ role: 'user', content: renderMessage({ ...baseContext, browser_state }) });
   }
 
   logger.error('Max iterations reached, invoking stop action');
@@ -171,15 +178,6 @@ function pickParams(source, actionDef) {
   return Object.fromEntries(
     Object.keys(actionDef.input_schema.properties).filter(k => k in source).map(k => [k, source[k]])
   );
-}
-
-async function insertBrowserState(conversation) {
-  const browserState = await getBrowserStateBundle();
-  const copy = conversation.map(m => ({ ...m }));
-  const lastUserIdx = copy.findLastIndex(m => m.role === 'user');
-  const browserMsg = { role: 'user', content: `Current Browser State:\n${browserState}` };
-  lastUserIdx > 0 ? copy.splice(lastUserIdx, 0, browserMsg) : copy.push(browserMsg);
-  return copy;
 }
 
 function buildTools(availableActions) {

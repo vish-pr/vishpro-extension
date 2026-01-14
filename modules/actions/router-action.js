@@ -31,7 +31,11 @@ export const routerAction = {
   steps: [
     {
       type: 'llm',
-      message: `{{user_message}}`,
+      message: `This is current {{{browser_state}}} 
+Goal to fulfill is: 
+{{{user_message}}} 
+
+Please choose a tool to fulfill goal, if already fulfilled please choose {{{stop_action}}}`,
       intelligence: 'MEDIUM',
       tool_choice: {
         available_actions: [

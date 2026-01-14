@@ -11,7 +11,8 @@ import {
   recordError,
   getModels,
   setModels,
-  getDefaultModels
+  getDefaultModels,
+  getAllModelsSortedByRecentErrors
 } from './models.js';
 import {
   getEndpoints,
@@ -70,6 +71,29 @@ export async function generate({ messages, intelligence = 'MEDIUM', tools, schem
       lastError = error;
       await recordError(endpoint, model, openrouterProvider);
       logger.warn(`LLM Failure: ${endpoint}/${model}`, { error: error.message });
+    }
+  }
+
+  // Fallback: try all models sorted by recent errors, ignoring backoff
+  logger.info('Cascade failed, attempting fallback recovery');
+  const sortedModels = await getAllModelsSortedByRecentErrors();
+
+  for (const { endpoint, model, openrouterProvider, noToolChoice } of sortedModels) {
+    try {
+      logger.info(`Fallback attempt: ${endpoint}/${model}`);
+      const result = await callOpenAICompatible({ endpoint, model, messages, tools, schema, openrouterProvider, noToolChoice });
+
+      if (tools && result.tool_calls?.length && !result.tool_calls[0].function?.name) {
+        throw new Error('Invalid tool call: missing function name');
+      }
+
+      logger.info(`Fallback success: ${endpoint}/${model}`);
+      await recordSuccess(endpoint, model, openrouterProvider);
+      return result;
+    } catch (error) {
+      lastError = error;
+      await recordError(endpoint, model, openrouterProvider);
+      logger.warn(`Fallback failure: ${endpoint}/${model}`, { error: error.message });
     }
   }
 

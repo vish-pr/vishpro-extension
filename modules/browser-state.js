@@ -13,7 +13,6 @@ async function getTabUrl(tabId, fallback = 'unknown') {
 class BrowserState {
   constructor() {
     this.tabs = new Map();
-    this.expandedTabId = null;
     this.currentTabId = null;
     this.currentTabUrl = null;
     this._readyPromise = null;
@@ -29,6 +28,8 @@ class BrowserState {
         const tab = await chrome.tabs.get(tabId);
         this.currentTabUrl = tab.url;
         this.registerTab(tabId, tab.url);
+        const tabState = this.tabs.get(tabId);
+        if (tabState) tabState.lastActivatedAt = new Date().toISOString();
       } catch (e) {
         console.warn('Failed to get tab info on activation:', e.message);
       }
@@ -58,16 +59,15 @@ class BrowserState {
     })();
   }
 
-  setExpandedTab(tabId) { this.expandedTabId = tabId; }
-
   registerTab(tabId, url) {
+    const now = new Date().toISOString();
     if (!this.tabs.has(tabId)) {
-      this.tabs.set(tabId, { tabId, currentUrl: url, urlHistory: [{ url, timestamp: new Date().toISOString() }], pageContents: [] });
+      this.tabs.set(tabId, { tabId, currentUrl: url, urlHistory: [{ url, timestamp: now }], pageContents: [], lastActivatedAt: now });
     } else {
       const tab = this.tabs.get(tabId);
       if (tab.currentUrl !== url) {
         tab.currentUrl = url;
-        tab.urlHistory.push({ url, timestamp: new Date().toISOString() });
+        tab.urlHistory.push({ url, timestamp: now });
       }
     }
     return this.tabs.get(tabId);
@@ -95,68 +95,44 @@ class BrowserState {
   removeTab(tabId) { return this.tabs.delete(tabId); }
 
   formatForChat() {
-    const lines = ['=== BROWSER STATE ===', `Current Tab: ${this.currentTabId} (${this.currentTabUrl || 'unknown'})\n`];
-    for (const [tabId, tab] of this.tabs) {
-      const isExpanded = tabId === this.expandedTabId;
-      lines.push(`Tab ${tabId}${tabId === this.currentTabId ? ' [CURRENT]' : ''}${isExpanded ? ' [EXPANDED]' : ''}:`);
-      lines.push(`  Current URL: ${tab.currentUrl}`);
-      if (tab.urlHistory.length > 1) {
-        lines.push('  URL History:');
-        tab.urlHistory.forEach((e, i) => lines.push(`    ${i + 1}. ${e.url} (${e.timestamp})`));
-      }
-      if (tab.pageContents.length > 0) {
-        lines.push('  Page Contents:');
-        tab.pageContents.forEach((pc, i) => {
-          lines.push(`    ${i + 1}. ${pc.status === 'updated' ? `[UPDATED to ${pc.updatedTo}]` : '[CURRENT]'} ${pc.url}`);
-          lines.push(`       Title: ${pc.content.title || 'N/A'}`);
-          if (isExpanded && pc.status === 'current') {
-            if (pc.content.text) lines.push(`       Text: ${pc.content.text}`);
-            if (pc.content.links?.length) {
-              lines.push(`       Links (${pc.content.links.length}):`);
-              pc.content.links.forEach(l => lines.push(`         [${l.id}]${l.text ? ` "${l.text}"` : ''} -> ${l.href || 'no href'}`));
-            }
-            if (pc.content.buttons?.length) {
-              lines.push(`       Buttons (${pc.content.buttons.length}):`);
-              pc.content.buttons.forEach(b => lines.push(`         [${b.id}]${b.text ? ` "${b.text}"` : ''}${b.class ? ` class="${b.class}"` : ''}`));
-            }
-            if (pc.content.inputs?.length) {
-              lines.push(`       Inputs (${pc.content.inputs.length}):`);
-              pc.content.inputs.forEach(inp => lines.push(`         [${inp.id}]${inp.type ? ` type="${inp.type}"` : ''}${inp.placeholder ? ` placeholder="${inp.placeholder}"` : ''}`));
-            }
-            if (pc.content.selects?.length) {
-              lines.push(`       Selects (${pc.content.selects.length}):`);
-              pc.content.selects.forEach(s => lines.push(`         [${s.id}] ${s.name || 'unnamed'}`));
-            }
-            if (pc.content.textareas?.length) {
-              lines.push(`       Textareas (${pc.content.textareas.length}):`);
-              pc.content.textareas.forEach(t => lines.push(`         [${t.id}] ${t.placeholder || 'no placeholder'}`));
-            }
-          } else {
-            if (pc.content.text) lines.push(`       Text: ${pc.content.text.substring(0, 200)}${pc.content.text.length > 200 ? '...' : ''}`);
-            if (pc.content.buttons?.length) lines.push(`       Buttons: ${pc.content.buttons.length} buttons`);
-            if (pc.content.links?.length) lines.push(`       Links: ${pc.content.links.length} links`);
-            if (pc.content.inputs?.length) lines.push(`       Inputs: ${pc.content.inputs.length} form inputs`);
-          }
-        });
-      }
-      lines.push('');
+    const lines = ['=== BROWSER STATE ==='];
+    const currentTab = this.tabs.get(this.currentTabId);
+
+    // Current tab with last 2 history entries
+    lines.push(`Current Tab: ${this.currentTabId} - ${this.currentTabUrl || 'unknown'}`);
+    if (currentTab && currentTab.urlHistory.length > 1) {
+      lines.push('History:');
+      const history = currentTab.urlHistory.slice(-3, -1).reverse();
+      history.forEach((e, i) => lines.push(`  ${i + 1}. ${e.url} (${e.timestamp})`));
     }
+
+    // Other tabs sorted by lastActivatedAt, capped at 10
+    const otherTabs = [...this.tabs.entries()]
+      .filter(([tabId]) => tabId !== this.currentTabId)
+      .sort((a, b) => (b[1].lastActivatedAt || '').localeCompare(a[1].lastActivatedAt || ''))
+      .slice(0, 10);
+
+    if (otherTabs.length > 0) {
+      lines.push('');
+      lines.push('Other Tabs (by recent activity):');
+      otherTabs.forEach(([tabId, tab], i) => lines.push(`  ${i + 1}. ${tabId} - ${tab.currentUrl}`));
+    }
+
     return lines.join('\n');
   }
 
   toJSON() {
-    const json = { tabs: {}, expandedTabId: this.expandedTabId };
+    const json = { tabs: {} };
     for (const [tabId, tab] of this.tabs) json.tabs[tabId] = tab;
     return json;
   }
 
   fromJSON(json) {
     this.tabs.clear();
-    this.expandedTabId = json.expandedTabId || null;
     if (json.tabs) Object.entries(json.tabs).forEach(([id, tab]) => this.tabs.set(+id, tab));
   }
 
-  clear() { this.tabs.clear(); this.expandedTabId = null; }
+  clear() { this.tabs.clear(); }
 
   async executeContentScript(tabId, action, params = {}) {
     try {
@@ -179,11 +155,13 @@ class BrowserState {
     const content = await this.executeContentScript(tabId, ContentAction.EXTRACT_CONTENT);
     if (!content || typeof content !== 'object') throw new Error('Failed to extract valid content from page');
     this.addPageContent(tabId, pageUrl, content);
-    this.setExpandedTab(tabId);
     return {
       extracted: true, page_url: pageUrl, tabId,
-      summary: { title: content.title || 'N/A', links: content.links?.length || 0, buttons: content.buttons?.length || 0, inputs: content.inputs?.length || 0 },
-      note: 'Full page content is available in the BROWSER STATE section above (tab marked as [EXPANDED])'
+      title: content.title || 'N/A',
+      text: content.text || '',
+      links: content.links || [],
+      buttons: content.buttons || [],
+      inputs: content.inputs || []
     };
   }
 

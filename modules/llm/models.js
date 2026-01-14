@@ -74,3 +74,22 @@ export async function recordError(endpoint, model, openrouterProvider) {
   await getModelStatsCounter().increment(key, 'error');
   await getModelStatsCounter().reset(key, ['skip']);
 }
+
+export async function getAllModelsSortedByRecentErrors() {
+  const models = await getModels();
+  const allModels = [];
+
+  for (const level of ['HIGH', 'MEDIUM', 'LOW']) {
+    for (const [endpoint, model, openrouterProvider, noToolChoice] of (models[level] || [])) {
+      allModels.push({ endpoint, model, openrouterProvider, noToolChoice });
+    }
+  }
+
+  const withStats = await Promise.all(allModels.map(async m => {
+    const key = modelStatsKey(m.endpoint, m.model, m.openrouterProvider);
+    const stats = await getModelStatsCounter().getStats(key);
+    return { ...m, recentErrors: stats?.error?.lastHour || 0 };
+  }));
+
+  return withStats.sort((a, b) => a.recentErrors - b.recentErrors);
+}

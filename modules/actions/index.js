@@ -51,19 +51,20 @@ function resolvePrompt(promptConfig, context) {
 
 /**
  * Resolve all templates for an LLM step
- * Returns { systemPrompt, message }
+ * Returns { systemPrompt, renderMessage }
+ * renderMessage takes context and renders the message template
  */
-export function resolveStepTemplates(step, action, context) {
+export function resolveStepTemplates(step, action) {
   let systemPrompt;
 
   if (step.tool_choice?.available_actions) {
     const decisionGuide = buildDecisionGuide(step.tool_choice.available_actions);
-    const template = `You are an assistant that can {{description}}. Execute the user's request by calling the appropriate tool.
+    const template = `You are an assistant that can {{{description}}}. Execute the user's request by calling the appropriate tool.
 
 **Decision Guide:**
-{{decisionGuide}}
+{{{decisionGuide}}}
 
-IMPORTANT: Always call a tool. Always finish with {{stopAction}}`;
+IMPORTANT: Always call a tool. Always finish with {{{stopAction}}}`;
 
     systemPrompt = Mustache.render(template, {
       description: action.description,
@@ -71,10 +72,10 @@ IMPORTANT: Always call a tool. Always finish with {{stopAction}}`;
       stopAction: step.tool_choice.stop_action
     });
   } else {
-    systemPrompt = resolvePrompt(step.system_prompt, context);
+    systemPrompt = (context) => resolvePrompt(step.system_prompt, context);
   }
 
-  const message = Mustache.render(step.message, context);
+  const renderMessage = (context) => Mustache.render(step.message, context);
 
-  return { systemPrompt, message };
+  return { systemPrompt, renderMessage };
 }

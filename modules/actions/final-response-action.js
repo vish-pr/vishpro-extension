@@ -69,7 +69,7 @@ Purpose:
 This system prompt will be given to LLM to extract information from data present. You do not need to extract information, but only create a system prompt which is relevant to this data.
 
 <messages>
-{{messages}}
+{{{messages}}}
 </messages>`,
       intelligence: 'LOW',
       output_schema: {
@@ -87,11 +87,11 @@ This system prompt will be given to LLM to extract information from data present
     {
       // Second LLM step - extract and summarize using the generated prompt
       type: 'llm',
-      system_prompt: '{{extraction_prompt}}',
+      system_prompt: '{{{extraction_prompt}}}',
       message: `Extract and summarize the relevant information. Focus on data that directly addresses the user's intent.
 
 <messages>
-{{messages}}
+{{{messages}}}
 </messages>
 
 In your response:
