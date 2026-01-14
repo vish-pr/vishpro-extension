@@ -54,7 +54,8 @@ export const routerAction = {
           LLM_TOOL,
           SUMMARY_TOOL
         ],
-        stop_action: SUMMARY_TOOL
+        stop_action: SUMMARY_TOOL,
+        max_iterations: 5
       }
     }
   ]

@@ -35,6 +35,11 @@ assert(actionsRegistry[BROWSER_ROUTER], `BROWSER_ROUTER "${BROWSER_ROUTER}" not 
 
 // Validate all actions
 for (const [name, action] of Object.entries(actionsRegistry)) {
+  // Actions must have required fields
+  assert(action.name === name, `${name}: action.name must match registry key`);
+  assert(action.description, `${name}: action must have description`);
+  assert(Array.isArray(action.steps) && action.steps.length > 0, `${name}: action must have steps array`);
+
   // Track available variables: start with action's input_schema properties
   const availableVars = new Set(Object.keys(action.input_schema?.properties || {}));
 
@@ -60,6 +65,12 @@ for (const [name, action] of Object.entries(actionsRegistry)) {
       assert(
         !(hasSchema && hasChoice),
         `${stepId}: LLM step cannot have both output_schema and tool_choice`
+      );
+
+      // Intelligence level must be explicitly specified
+      assert(
+        step.intelligence,
+        `${stepId}: LLM step must explicitly specify intelligence level`
       );
 
       // Validate mustache variables are available
@@ -94,9 +105,13 @@ for (const [name, action] of Object.entries(actionsRegistry)) {
 
     // Validate tool_choice config
     if (step.tool_choice) {
-      const { available_actions, stop_action } = step.tool_choice;
+      const { available_actions, stop_action, max_iterations } = step.tool_choice;
 
       assert(stop_action, `${stepId}: tool_choice.stop_action is required`);
+      assert(
+        typeof max_iterations === 'number' && max_iterations > 0,
+        `${stepId}: tool_choice.max_iterations must be explicitly specified`
+      );
 
       assert(
         available_actions?.includes(stop_action),

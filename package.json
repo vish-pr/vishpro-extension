@@ -20,10 +20,10 @@
     "sortablejs": "^1.15.6"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.0.0",
+    "@tailwindcss/cli": "^4.1.18",
     "concurrently": "^9.2.1",
     "daisyui": "^5.0.0",
     "esbuild": "^0.24.0",
-    "tailwindcss": "^4.0.0"
+    "tailwindcss": "^4.1.18"
   }
 }
