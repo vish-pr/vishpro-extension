@@ -14,7 +14,7 @@ export const PREDEFINED_ENDPOINTS = {
     name: 'OpenRouter',
     url: 'https://openrouter.ai/api/v1/chat/completions',
     modelsUrl: 'https://openrouter.ai/api/v1/models',
-    extraHeaders: { 'X-Title': 'VishPro Browser Agent' }
+    extraHeaders: { 'X-Title': 'Vishpr Browser Agent' }
   },
   [GROQ_ID]: {
     name: 'Groq',

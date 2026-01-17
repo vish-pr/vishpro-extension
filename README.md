@@ -1,4 +1,4 @@
-# VishPro Browser Agent
+# Vishpr Browser Agent
 
 Chrome extension that automates web browsing through natural language using LLMs via OpenRouter.
 

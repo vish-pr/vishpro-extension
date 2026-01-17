@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "VishPro Browser Agent",
+  "name": "Vishpr Browser Agent",
   "version": "1.0.0",
   "description": "Browser extension that uses LLMs to automate web browsing tasks through natural language commands",
   "icons": {
@@ -32,7 +32,7 @@
     "<all_urls>"
   ],
   "action": {
-    "default_title": "Open VishPro Agent",
+    "default_title": "Open Vishpr Agent",
     "default_icon": "icon-128.png"
   }
 }
